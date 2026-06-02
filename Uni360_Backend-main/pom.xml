@@ -249,6 +249,13 @@
             </exclusions>
         </dependency>
 
+        <!-- Dotenv - Load .env file at startup for local development -->
+        <dependency>
+            <groupId>me.paulschwarz</groupId>
+            <artifactId>spring-dotenv</artifactId>
+            <version>4.0.0</version>
+        </dependency>
+
         <!-- Monitoring -->
         <dependency>
             <groupId>io.micrometer</groupId>

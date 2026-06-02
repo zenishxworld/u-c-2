@@ -103,7 +103,7 @@ spring:
 
 # Server Configuration
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
   shutdown: graceful
   netty:
     connection-timeout: 20s
@@ -354,6 +354,7 @@ uniflow:
       cover-letter-endpoint: /webhook/coverletter
       timeout: 120s
       webhook-secret: ${UNIFLOW_AI_N8N_WEBHOOK_SECRET:uniflow-n8n-secret-2025}
+      webhook-url: ${N8N_WEBHOOK_URL:}
     ollama:
       base-url: ${UNIFLOW_AI_OLLAMA_BASE_URL:http://localhost:11434}
       timeout: ${UNIFLOW_AI_OLLAMA_TIMEOUT:60s}
@@ -472,6 +473,7 @@ uniflow:
       cover-letter-endpoint: /webhook/coverletter
       timeout: 120s
       webhook-secret: ${UNIFLOW_AI_N8N_WEBHOOK_SECRET:uniflow-n8n-secret-2025}
+      webhook-url: ${N8N_WEBHOOK_URL:}
     ollama:
       base-url: ${UNIFLOW_AI_OLLAMA_BASE_URL:http://localhost:11434}
       timeout: ${UNIFLOW_AI_OLLAMA_TIMEOUT:120s}

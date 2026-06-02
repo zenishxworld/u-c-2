@@ -21,4 +21,10 @@ public class N8nProperties {
      * This is sent as X-Webhook-Secret header to all webhook calls.
      */
     private String webhookSecret = "uniflow-n8n-secret-2025";
+
+    /**
+     * Public/external n8n webhook URL (for callbacks or external triggers).
+     * Maps from N8N_WEBHOOK_URL env var.
+     */
+    private String webhookUrl;
 }
