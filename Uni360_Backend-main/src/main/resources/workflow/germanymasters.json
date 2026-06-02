@@ -1,0 +1,310 @@
+{
+    "success": true,
+    "message": "Workflow definition retrieved successfully",
+    "data": {
+        "id": 18,
+        "definitionKey": "UNI360_DE_MASTERS_WORKFLOW",
+        "definitionName": "UNI360 DE MASTERS Workflow",
+        "definitionDescription": "Workflow for uni360 client, DE country, MASTERS degree applications",
+        "clientId": "uni360",
+        "countryCode": "DE",
+        "degreeLevel": "MASTERS",
+        "version": 4,
+        "isActive": true,
+        "deploymentId": "uni360-f44f2201-1776406246411",
+        "workflowConfig": {
+            "name": "Germany MASTERSs Application Workflow",
+            "stages": [
+                {
+                    "name": "APPLICATION_REVIEW",
+                    "order": 1,
+                    "tasks": [
+                        {
+                            "type": "APPLICATION_CLAIM",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "GENERAL_ADMIN"
+                            ],
+                            "description": "Initial claim of application for processing",
+                            "displayName": "Claim Application",
+                            "requiredFlags": [
+                                "profile_completed",
+                                "documents_uploaded"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "APPLICATION_REVIEW"
+                            ],
+                            "estimatedDurationHours": 1
+                        }
+                    ],
+                    "description": "Initial review and validation of application documents",
+                    "displayName": "Application Review"
+                },
+                {
+                    "name": "ACADEMIC_EVALUATION",
+                    "order": 2,
+                    "tasks": [
+                        {
+                            "type": "DOCUMENT_VERIFICATION",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN"
+                            ],
+                            "description": "Verify all required documents are uploaded and valid",
+                            "displayName": "Document Verification",
+                            "requiredFlags": [
+                                "documents_uploaded",
+                                "transcript_verified",
+                                "diploma_verified"
+                            ],
+                            "validationRule": "DOCUMENT_UPLOADED",
+                            "requiredDocuments": [
+                                "TRANSCRIPT",
+                                "DIPLOMA",
+                                "PASSPORT"
+                            ],
+                            "estimatedDurationHours": 2
+                        },
+                        {
+                            "type": "ACADEMIC_VERIFICATION",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "ACADEMIC_SPECIALIST"
+                            ],
+                            "description": "Verify academic credentials meet German university standards",
+                            "displayName": "Academic Credential Verification",
+                            "requiredFlags": [
+                                "academic_documents_uploaded",
+                                "gpa_calculated",
+                                "degree_verified"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "ACADEMIC_EVALUATION"
+                            ],
+                            "estimatedDurationHours": 3
+                        },
+                        {
+                            "type": "LANGUAGE_VERIFICATION",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "LANGUAGE_SPECIALIST",
+                                "COUNTRY_ADMIN"
+                            ],
+                            "description": "Verify language requirements for German universities",
+                            "displayName": "Language Proficiency Verification",
+                            "requiredFlags": [
+                                "language_test_uploaded",
+                                "language_score_verified"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "estimatedDurationHours": 1
+                        }
+                    ],
+                    "description": "Evaluation of academic credentials and requirements",
+                    "displayName": "Academic Evaluation"
+                },
+                {
+                    "name": "CERTIFICATION_PROCESS",
+                    "order": 3,
+                    "tasks": [
+                        {
+                            "type": "APS_CERTIFICATE",
+                            "priority": 3,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "CERTIFICATION_SPECIALIST"
+                            ],
+                            "description": "Process APS certificate requirements for Germany",
+                            "displayName": "APS Certificate Processing",
+                            "requiredFlags": [
+                                "aps_certificate_uploaded",
+                                "aps_appointment_booked"
+                            ],
+                            "validationRule": "DOCUMENT_UPLOADED",
+                            "requiredDocuments": [
+                                "APS_CERTIFICATE"
+                            ],
+                            "estimatedDurationHours": 4
+                        },
+                        {
+                            "type": "PAYMENT_PROCESSING",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "FINANCE_ADMIN",
+                                "COUNTRY_ADMIN"
+                            ],
+                            "description": "Process application fees and certification costs",
+                            "displayName": "Payment Processing",
+                            "requiredFlags": [
+                                "payment_initiated",
+                                "payment_amount_confirmed"
+                            ],
+                            "validationRule": "PAYMENT_CONFIRMATION",
+                            "estimatedDurationHours": 1
+                        }
+                    ],
+                    "description": "Process required certifications and validations",
+                    "displayName": "Certification Process"
+                },
+                {
+                    "name": "FEES_PAYMENT",
+                    "order": 4,
+                    "tasks": [
+                        {
+                            "type": "BLOCK_ACCOUNT",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "FINANCE_ADMIN",
+                                "COUNTRY_ADMIN"
+                            ],
+                            "description": "Verify student has opened and funded a blocked bank account (Sperrkonto) as required for German student visa",
+                            "displayName": "Block Account Verification",
+                            "requiredFlags": [
+                                "block_account_opened",
+                                "block_account_funded"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "estimatedDurationHours": 2
+                        },
+                        {
+                            "type": "TUITION_FEES_PAYMENT",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "FINANCE_ADMIN",
+                                "COUNTRY_ADMIN"
+                            ],
+                            "description": "Verify student has paid tuition fees to the university",
+                            "displayName": "Tuition Fees Payment Verification",
+                            "requiredFlags": [
+                                "fees_payment_initiated",
+                                "fees_payment_completed",
+                                "payment_receipt_uploaded"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredDocuments": [
+                                "PAYMENT_RECEIPT",
+                                "PAYMENT_CONFIRMATION"
+                            ],
+                            "estimatedDurationHours": 2
+                        }
+                    ],
+                    "description": "Student fees payment process before university submission",
+                    "displayName": "Fees Payment"
+                },
+                {
+                    "name": "UNIVERSITY_SUBMISSION",
+                    "order": 5,
+                    "tasks": [
+                        {
+                            "type": "UNIVERSITY_SUBMISSION",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "UNIVERSITY_LIAISON"
+                            ],
+                            "description": "Submit complete application to selected German universities",
+                            "displayName": "Submit to Universities",
+                            "requiredFlags": [
+                                "all_documents_verified",
+                                "payment_completed",
+                                "universities_selected"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "UNIVERSITY_SUBMISSION"
+                            ],
+                            "estimatedDurationHours": 2
+                        }
+                    ],
+                    "description": "Final submission to selected German universities",
+                    "displayName": "University Submission"
+                },
+                {
+                    "name": "VISA_APPLICATION",
+                    "order": 6,
+                    "tasks": [
+                        {
+                            "type": "VISA_APPLICATION_SCHEDULED",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "VISA_SPECIALIST"
+                            ],
+                            "description": "Schedule visa appointment for the student",
+                            "displayName": "Visa Appointment Scheduled",
+                            "requiredFlags": [
+                                "visa_appointment_scheduled"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "VISA_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 1
+                        },
+                        {
+                            "type": "VISA_APPLICATION_COMPLETED",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "VISA_SPECIALIST"
+                            ],
+                            "description": "Verify student has completed and submitted visa application",
+                            "displayName": "Visa Application Completed",
+                            "requiredFlags": [
+                                "visa_documents_prepared",
+                                "visa_application_submitted",
+                                "visa_fees_paid"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredDocuments": [
+                                "VISA_APPLICATION_FORM",
+                                "CAS_LETTER"
+                            ],
+                            "requiredPermissions": [
+                                "VISA_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 3
+                        },
+                        {
+                            "type": "VISA_APPLICATION_RESULT",
+                            "priority": 3,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "VISA_SPECIALIST"
+                            ],
+                            "description": "Record and verify the outcome of the student's visa application",
+                            "displayName": "Visa Application Result",
+                            "requiredFlags": [
+                                "visa_result_received",
+                                "visa_result_verified"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredDocuments": [
+                                "VISA_DECISION_LETTER"
+                            ],
+                            "requiredPermissions": [
+                                "VISA_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 1
+                        }
+                    ],
+                    "description": "Student visa application process",
+                    "displayName": "Visa Application"
+                }
+            ],
+            "countryCode": "DE",
+            "degreeLevel": "MASTERS",
+            "description": "Complete workflow for MASTERS degree applications to German universities",
+            "workflowDefinitionKey": "GERMANY_MASTERSS_WORKFLOW"
+        },
+        "createdAt": "2026-04-17T06:10:46.493480",
+        "updatedAt": "2026-04-17T06:10:46.493480",
+        "createdBy": "admin@uni360.com",
+        "updatedBy": "admin@uni360.com"
+    },
+    "timestamp": "2026-05-22T10:22:51"
+}

@@ -1,0 +1,394 @@
+{
+  "name": "LOR Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "LOR",
+        "formDescription": "Generate LOR by filling this form",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "Name of the senior writing LOR",
+              "fieldLabel": "Name of the senior writing LOR",
+              "requiredField": true
+            },
+            {
+              "fieldName": "Student Name",
+              "fieldLabel": "Student Name",
+              "requiredField": true
+            },
+            {
+              "fieldName": "University Name",
+              "fieldLabel": "University Name",
+              "requiredField": true
+            },
+            {
+              "fieldName": "Location",
+              "fieldLabel": "Location",
+              "placeholder": "City, Country",
+              "requiredField": true
+            },
+            {
+              "fieldName": "Field",
+              "fieldLabel": "Field",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Chemical"
+                  },
+                  {
+                    "option": "Mechanical"
+                  },
+                  {
+                    "option": "Electrical"
+                  },
+                  {
+                    "option": "Software Engineer"
+                  },
+                  {
+                    "option": "Computer Science"
+                  },
+                  {
+                    "option": "BBA"
+                  },
+                  {
+                    "option": "Pharmacy"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "Best at (Skills)",
+              "fieldLabel": "Best at (Skills)",
+              "requiredField": true
+            },
+            {
+              "fieldName": "Projects (Optional)",
+              "fieldLabel": "Projects (Optional)"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.4,
+      "position": [
+        -704,
+        752
+      ],
+      "id": "32d3b933-02d7-479c-af0d-66f7c3e57a91",
+      "name": "On form submission",
+      "webhookId": "52428eb5-e50c-4717-83be-092040a93f1a"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lor-generator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -704,
+        352
+      ],
+      "id": "2f91fed9-77ac-45b8-ba0b-3bfa51877ef0",
+      "name": "Webhook Trigger",
+      "webhookId": "lor-generator-webhook-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = items[0].json.body || {};\nreturn [{\n  json: {\n    \"Name of the senior writing LOR\": body[\"Name of the senior writing LOR\"] || \"\",\n    \"Student Name\": body[\"Student Name\"] || \"\",\n    \"Gender\": body[\"Gender\"] || \"\",\n    \"University Name\": body[\"University Name\"] || \"\",\n    \"Location\": body[\"Location\"] || \"\",\n    \"Field\": body[\"Field\"] || \"\",\n    \"Recommender Designation\": body[\"Recommender Designation\"] || \"\",\n    \"Relationship Type\": body[\"Relationship Type\"] || \"\",\n    \"Relationship Duration\": body[\"Relationship Duration\"] || \"\",\n    \"Best at (Skills)\": body[\"Best at (Skills)\"] || \"\",\n    \"Projects (Optional)\": body[\"Projects (Optional)\"] || \"\",\n    \"Recommendation Level\": body[\"Recommendation Level\"] || \"\",\n    \"Analytical Skills\": body[\"Analytical Skills\"] || \"\",\n    \"Leadership Skills\": body[\"Leadership Skills\"] || \"\",\n    \"Teamwork\": body[\"Teamwork\"] || \"\",\n    \"Research Ability\": body[\"Research Ability\"] || \"\",\n    \"Class Rank\": body[\"Class Rank\"] || \"\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        352
+      ],
+      "id": "effb12bc-c953-4aad-a6ad-3126d759961b",
+      "name": "Flatten Webhook Body"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are generating a Letter of Recommendation.\n\nIMPORTANT:\n- Generate a letter of minimum 300-450 words\n- Use the pine-cone vector database for reference and to match writing style\n- The output must closely match the structure, tone, and wording shown below.\n- Use the student's full name only in the first paragraph.\n- In later paragraphs, refer to them using correct pronouns based on their gender (Gender: {{ $json[\"Gender\"] }}).\n- Do NOT rephrase sentences unnecessarily.\n- Do NOT add extra examples, projects, or opinions.\n- Do NOT remove or reorder paragraphs.\n- Only replace placeholders using the provided JSON values.\n- Keep the language natural, formal, and human-written.\n- Maintain paragraph breaks exactly as shown.\n- Write in first person.\n- Do not add a date or letterhead.\n- Do not add explanations or headings.\n\nUSE THIS DATA:\nName of senior writing LOR: **{{ $json[\"Name of the senior writing LOR\"] }}**\nRecommender Designation: **{{ $json[\"Recommender Designation\"] }}**\nStudent Name: **{{ $json[\"Student Name\"] }}**\nGender: {{ $json[\"Gender\"] }}\nUniversity Name: **{{ $json[\"University Name\"] }}**\nLocation: **{{ $json[\"Location\"] }}**\nField: **{{ $json[\"Field\"] }}**\nRelationship Type: **{{ $json[\"Relationship Type\"] }}**\nRelationship Duration: **{{ $json[\"Relationship Duration\"] }}**\nBest at (Skills): **{{ $json[\"Best at (Skills)\"] }}**\nProjects: **{{ $json[\"Projects (Optional)\"] }}**\nRecommendation Level: **{{ $json[\"Recommendation Level\"] }}**\n\nOptional Recommender Feedback:\nAnalytical Skills: **{{ $json[\"Analytical Skills\"] }}**\nLeadership Skills: **{{ $json[\"Leadership Skills\"] }}**\nTeamwork: **{{ $json[\"Teamwork\"] }}**\nResearch Ability: **{{ $json[\"Research Ability\"] }}**\nClass Rank: **{{ $json[\"Class Rank\"] }}**\n\nUSE THIS STRUCTURE:\nTo Whom It May Concern,\n\nI am writing this letter to express my support for **{{ $json[\"Student Name\"] }}** of field **{{ $json[\"Field\"] }}**. I have known them for **{{ $json[\"Relationship Duration\"] }}** in my capacity as **{{ $json[\"Relationship Type\"] }}** at **{{ $json[\"University Name\"] }}**, located in **{{ $json[\"Location\"] }}**. During this period, I have had multiple opportunities to interact with the student closely and observe their approach to learning, responsibility, and professional conduct. Based on these experiences, I am pleased to share my perspective on their suitability for further academic or professional opportunities.\n\nFrom my experience, **{{ $json[\"Student Name\"] }}** has demonstrated a sound understanding of their field of study and a practical approach toward applying theoretical concepts. They are comfortable working across different aspects of their domain and show the ability to connect individual components into a cohesive outcome. I have observed them handling assigned work with care and patience and being particularly strong in **{{ $json[\"Best at (Skills)\"] }}**, especially when faced with challenges that required additional effort or revision. Additionally, they have shown strong qualities in their **{{ $json[\"Analytical Skills\"] }}**, **{{ $json[\"Research Ability\"] }}** and **{{ $json[\"Leadership Skills\"] }}**, which was evident during their projects, particularly **{{ $json[\"Projects (Optional)\"] }}**. They placed in the **{{ $json[\"Class Rank\"] }}** rank of their class. Rather than looking for quick solutions, they showed a willingness to work through problems and improve the quality of their output.\n\nWhat I have personally appreciated is the student's attitude toward learning. They tend to ask relevant questions and try to understand the reasoning behind decisions instead of merely following instructions. Feedback is taken positively, and I have noticed visible improvement in their work after suggestions were provided. They manage their time responsibly and can be relied upon to meet expectations without the need for constant supervision. In group settings, they are highly cooperative, showing excellent **{{ $json[\"Teamwork\"] }}** skills, while also being capable of working independently when required.\n\nOn a personal level, they maintain a respectful and professional demeanor. They approach responsibilities with sincerity and remain focused even when dealing with unfamiliar or demanding tasks. In my opinion, this consistency and willingness to learn are qualities that contribute significantly to long-term growth, regardless of the specific role or academic path they choose.\n\nBased on my experience working with them, I believe they have a solid foundation and the right mindset to succeed in future academic or professional environments. They show dedication toward their work and a genuine interest in continuous improvement. I **{{ $json[\"Recommendation Level\"] }}** them for admission and carry out their responsibilities with seriousness and commitment.\n\nSincerely,\n**{{ $json[\"Name of the senior writing LOR\"] }}**\n**{{ $json[\"Recommender Designation\"] }}**\n\nOUTPUT ONLY THE FINAL LETTER TEXT. DO NOT ADD OR REMOVE ANY PARAGRAPHS.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -208,
+        352
+      ],
+      "id": "41ba22cf-2ab3-4759-ac40-b56b3d09a0bb",
+      "name": "AI Agent - Webhook"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are generating a Letter of Recommendation.\n\nIMPORTANT:\n- Generate a letter of minimum 300-450 words\n- Use the pine-cone vector database for reference and to match writing style\n- Write in first person. Do not add a date or letterhead.\n\nUSE THIS DATA:\nName of senior writing LOR: **{{ $json[\"Name of the senior writing LOR\"] }}**\nStudent Name: **{{ $json[\"Student Name\"] }}**\nUniversity Name: **{{ $json[\"University Name\"] }}**\nLocation: **{{ $json[\"Location\"] }}**\nField: **{{ $json[\"Field\"] }}**\nBest at (Skills): **{{ $json[\"Best at (Skills)\"] }}**\nProjects: **{{ $json[\"Projects (Optional)\"] }}**\n\nTo Whom It May Concern,\n\nI am writing this letter in support of **{{ $json[\"Student Name\"] }}**, of field **{{ $json[\"Field\"] }}**, whom I have known for some time in an academic and mentoring capacity at **{{ $json[\"University Name\"] }}**, located in **{{ $json[\"Location\"] }}**.\n\nSincerely,\n**{{ $json[\"Name of the senior writing LOR\"] }}**\n\nOUTPUT ONLY THE FINAL LETTER TEXT.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -480,
+        752
+      ],
+      "id": "773c08b4-c90d-44f9-86f1-48ea9567f69e",
+      "name": "AI Agent - Form"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Generate Lor",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "test",
+          "mode": "list",
+          "cachedResultName": "test"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        560
+      ],
+      "id": "5939c657-ec3e-4eea-a86f-3ea364c46851",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+        "pineconeApi": {
+          "id": "8rdn8HUk2cilAVdz",
+          "name": "LOR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ output: $json.output }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        352
+      ],
+      "id": "0044be38-8585-4d5e-bf6f-64924b7f156c",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "LOR Generated",
+        "completionMessage": "={{ $json.output }}",
+        "limitWaitTime": "={{ false }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.4,
+      "position": [
+        -208,
+        752
+      ],
+      "id": "01facfce-fcb3-4c08-8975-f70684cda1f6",
+      "name": "Form Completion",
+      "webhookId": "105a8cdc-b284-4701-88c1-c2087e338c03"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -320,
+        112
+      ],
+      "id": "7cc22846-4b74-4a58-b75e-ce17387bf246",
+      "name": "Anthropic Chat Model - Webhook",
+      "credentials": {
+        "anthropicApi": {
+          "id": "wwPu8UJY4nqNlGR4",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -544,
+        992
+      ],
+      "id": "c6d2be6c-bd40-47d7-a475-abf6daa15f0c",
+      "name": "Anthropic Chat Model - Form",
+      "credentials": {
+        "anthropicApi": {
+          "id": "wwPu8UJY4nqNlGR4",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-2"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        288,
+        736
+      ],
+      "id": "4f35fe01-fccf-4837-a377-e16477b2ba78",
+      "name": "Embeddings Google Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "rOldwysbQ7phrKLq",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Flatten Webhook Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Webhook Body": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Form": {
+      "main": [
+        [
+          {
+            "node": "Form Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent - Webhook",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ],
+      "ai_vectorStore": [
+        []
+      ]
+    },
+    "Anthropic Chat Model - Webhook": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Webhook",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model - Form": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Form",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4b634d1a-f913-43ef-a728-b7ccd9027739",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d57e2d7c93e52cdb902ab43ddb3c518f4167b13d72edbdc9d74758f6091c72a8"
+  },
+  "id": "yXHtJABWWQOSLInV",
+  "tags": []
+}

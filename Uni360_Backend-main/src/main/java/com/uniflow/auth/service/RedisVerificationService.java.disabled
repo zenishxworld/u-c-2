@@ -1,0 +1,457 @@
+package com.uniflow.auth.service;
+
+import com.uniflow.notification.service.NotificationHelper;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RedissonReactiveClient;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+/**
+ * Redis-based verification service using Redisson for managing email verification tokens.
+ *
+ * <p>This service handles: - Storing verification tokens with TTL - Tracking verification attempts
+ * - Rate limiting verification attempts - Configurable base URL for verification links
+ */
+@Service
+@ConditionalOnProperty(name = "uniflow.cache.enabled", havingValue = "true")
+@RequiredArgsConstructor
+@Slf4j
+public class RedisVerificationService implements VerificationServiceInterface {
+
+  private final RedissonReactiveClient redissonReactiveClient;
+  private final NotificationHelper notificationHelper;
+
+  // Redis key prefixes
+  private static final String VERIFICATION_TOKEN_PREFIX = "uniflow:auth:verification:token:";
+  private static final String VERIFICATION_ATTEMPTS_PREFIX = "uniflow:auth:verification:attempts:";
+  private static final String VERIFICATION_STATS_PREFIX = "uniflow:auth:verification:stats";
+
+  // Configuration
+  @Value("${uniflow.verification.token-expiry-hours:24}")
+  private int tokenExpiryHours;
+
+  @Value("${uniflow.verification.max-attempts:5}")
+  private int maxVerificationAttempts;
+
+  @Value("${uniflow.verification.attempt-window-minutes:60}")
+  private int attemptWindowMinutes;
+
+  @Value("${uniflow.base-url:http://localhost:8080}")
+  private String baseUrl;
+
+  /**
+   * Generate and store a verification token for a user.
+   *
+   * @param userId The user ID
+   * @param email The user's email address
+   * @param userType The type of user (STUDENT, ADMIN)
+   * @return Mono containing the verification token and expiry information
+   */
+  public Mono<VerificationTokenInfo> generateVerificationToken(
+      Long userId, String email, String userType) {
+    String token = UUID.randomUUID().toString();
+    LocalDateTime expiresAt = LocalDateTime.now().plusHours(tokenExpiryHours);
+
+    VerificationTokenData tokenData =
+        VerificationTokenData.builder()
+            .userId(userId)
+            .email(email)
+            .userType(userType)
+            .token(token)
+            .createdAt(LocalDateTime.now())
+            .expiresAt(expiresAt)
+            .isUsed(false)
+            .build();
+
+    String tokenKey = VERIFICATION_TOKEN_PREFIX + token;
+    Duration ttl = Duration.ofHours(tokenExpiryHours);
+
+    return redissonReactiveClient
+        .getBucket(tokenKey)
+        .set(tokenData, ttl)
+        .doOnSuccess(
+            success -> {
+              log.debug(
+                  "Stored verification token for user ID: {} with expiry: {}", userId, expiresAt);
+              incrementStats("tokens_generated");
+            })
+        .doOnError(
+            error -> log.error("Failed to store verification token for user ID: {}", userId, error))
+        .then(
+            Mono.fromCallable(
+                () -> {
+                  String verificationLink = buildVerificationLink(token);
+
+                  // Send notifications via NotificationHelper
+                  notificationHelper
+                      .notifyVerificationLink(
+                          token, email, verificationLink, userId, userType, expiresAt)
+                      .subscribe();
+
+                  return VerificationTokenInfo.builder()
+                      .token(token)
+                      .expiresAt(expiresAt)
+                      .verificationLink(verificationLink)
+                      .build();
+                }));
+  }
+
+  /**
+   * Validate and consume a verification token.
+   *
+   * @param token The verification token
+   * @return Mono containing validation result
+   */
+  public Mono<VerificationResult> validateAndConsumeToken(String token) {
+    if (token == null || token.trim().isEmpty()) {
+      return Mono.just(VerificationResult.invalid("Token is required"));
+    }
+
+    String tokenKey = VERIFICATION_TOKEN_PREFIX + token;
+    String attemptsKey = VERIFICATION_ATTEMPTS_PREFIX + token;
+
+    // Check rate limiting first
+    return checkRateLimit(attemptsKey)
+        .flatMap(
+            rateLimitOk -> {
+              if (!rateLimitOk) {
+                return Mono.just(
+                    VerificationResult.rateLimited(
+                        "Too many verification attempts. Please try again later."));
+              }
+
+              // Get and validate token
+              return redissonReactiveClient
+                  .getBucket(tokenKey)
+                  .<VerificationTokenData>get()
+                  .cast(VerificationTokenData.class)
+                  .switchIfEmpty(Mono.error(new RuntimeException("Invalid or expired token")))
+                  .flatMap(
+                      tokenData -> {
+                        // Check if token is expired
+                        if (tokenData.getExpiresAt().isBefore(LocalDateTime.now())) {
+                          incrementStats("tokens_expired");
+                          return Mono.just(
+                              VerificationResult.expired("Verification token has expired"));
+                        }
+
+                        // Check if token is already used
+                        if (tokenData.isUsed()) {
+                          incrementStats("tokens_already_used");
+                          return Mono.just(
+                              VerificationResult.alreadyUsed(
+                                  "Verification token has already been used"));
+                        }
+
+                        // Mark token as used
+                        tokenData.setUsed(true);
+                        tokenData.setUsedAt(LocalDateTime.now());
+
+                        return redissonReactiveClient
+                            .getBucket(tokenKey)
+                            .set(
+                                tokenData,
+                                Duration.ofMinutes(30)) // Keep for 30 minutes after use for audit
+                            .then(
+                                Mono.just(
+                                    VerificationResult.success(
+                                        tokenData.getUserId(),
+                                        tokenData.getEmail(),
+                                        tokenData.getUserType())))
+                            .doOnSuccess(
+                                result -> {
+                                  log.info(
+                                      "Successfully verified token for user ID: {} ({})",
+                                      tokenData.getUserId(),
+                                      tokenData.getEmail());
+                                  incrementStats("tokens_verified");
+                                });
+                      });
+            })
+        .doOnError(
+            error -> {
+              log.error("Error validating verification token: {}", token, error);
+              incrementStats("validation_errors");
+            })
+        .onErrorReturn(VerificationResult.error("An error occurred during token validation"));
+  }
+
+  /** Check if verification attempts are within rate limit. */
+  private Mono<Boolean> checkRateLimit(String attemptsKey) {
+    return redissonReactiveClient
+        .getAtomicLong(attemptsKey)
+        .get()
+        .map(attempts -> attempts < maxVerificationAttempts)
+        .flatMap(
+            withinLimit -> {
+              if (withinLimit) {
+                // Increment attempt counter
+                return redissonReactiveClient
+                    .getAtomicLong(attemptsKey)
+                    .incrementAndGet()
+                    .flatMap(
+                        newCount -> {
+                          if (newCount == 1) {
+                            // Set TTL for first attempt
+                            return redissonReactiveClient
+                                .getAtomicLong(attemptsKey)
+                                .expire(Duration.ofMinutes(attemptWindowMinutes))
+                                .then(Mono.just(true));
+                          }
+                          return Mono.just(true);
+                        });
+              }
+              return Mono.just(false);
+            })
+        .doOnNext(
+            withinLimit -> {
+              if (!withinLimit) {
+                incrementStats("rate_limited_attempts");
+              }
+            });
+  }
+
+  /** Get verification token information without consuming it. */
+  public Mono<VerificationTokenData> getTokenInfo(String token) {
+    if (token == null || token.trim().isEmpty()) {
+      return Mono.empty();
+    }
+
+    String tokenKey = VERIFICATION_TOKEN_PREFIX + token;
+
+    return redissonReactiveClient
+        .getBucket(tokenKey)
+        .<VerificationTokenData>get()
+        .cast(VerificationTokenData.class)
+        .doOnNext(tokenData -> log.debug("Retrieved token info for token: {}", token))
+        .doOnError(error -> log.error("Error retrieving token info: {}", token, error));
+  }
+
+  /** Invalidate a verification token. */
+  public Mono<Void> invalidateToken(String token) {
+    if (token == null || token.trim().isEmpty()) {
+      return Mono.empty();
+    }
+
+    String tokenKey = VERIFICATION_TOKEN_PREFIX + token;
+
+    return redissonReactiveClient
+        .getBucket(tokenKey)
+        .delete()
+        .doOnSuccess(
+            deleted -> {
+              if (deleted) {
+                log.debug("Invalidated verification token: {}", token);
+                incrementStats("tokens_invalidated");
+              }
+            })
+        .then();
+  }
+
+  /** Get verification service statistics. */
+  public Mono<VerificationStats> getStats() {
+    return redissonReactiveClient
+        .getMap(VERIFICATION_STATS_PREFIX)
+        .getAll(
+            java.util.Set.of(
+                "tokens_generated",
+                "tokens_verified",
+                "tokens_expired",
+                "tokens_already_used",
+                "tokens_invalidated",
+                "rate_limited_attempts",
+                "validation_errors"))
+        .map(
+            values ->
+                VerificationStats.builder()
+                    .tokensGenerated(parseLong(values.get("tokens_generated")))
+                    .tokensVerified(parseLong(values.get("tokens_verified")))
+                    .tokensExpired(parseLong(values.get("tokens_expired")))
+                    .tokensAlreadyUsed(parseLong(values.get("tokens_already_used")))
+                    .tokensInvalidated(parseLong(values.get("tokens_invalidated")))
+                    .rateLimitedAttempts(parseLong(values.get("rate_limited_attempts")))
+                    .validationErrors(parseLong(values.get("validation_errors")))
+                    .build())
+        .doOnError(error -> log.error("Error retrieving verification stats", error))
+        .onErrorReturn(VerificationStats.builder().build());
+  }
+
+  /** Clear all verification data (for testing/admin purposes). */
+  public Mono<Long> clearAll() {
+    log.warn("Clearing all verification data");
+
+    return redissonReactiveClient
+        .getKeys()
+        .getKeysByPattern(VERIFICATION_TOKEN_PREFIX + "*")
+        .concatWith(
+            redissonReactiveClient.getKeys().getKeysByPattern(VERIFICATION_ATTEMPTS_PREFIX + "*"))
+        .collectList()
+        .flatMap(
+            keys -> {
+              if (keys.isEmpty()) {
+                log.info("No verification data to clear");
+                return Mono.just(0L);
+              }
+
+              return redissonReactiveClient.getKeys().delete(keys.toArray(new String[0]));
+            })
+        .flatMap(
+            deletedCount -> {
+              log.info("Cleared {} verification entries", deletedCount);
+              return redissonReactiveClient.getKeys().delete(VERIFICATION_STATS_PREFIX);
+            })
+        .then(Mono.just(0L));
+  }
+
+  /** Build verification link using configurable base URL. */
+  private String buildVerificationLink(String token) {
+    return String.format(
+        "%s/api/v1/auth/verify-email?token=%s", baseUrl.replaceAll("/$", ""), token);
+  }
+
+  /** Increment statistics counter. */
+  private void incrementStats(String field) {
+    redissonReactiveClient
+        .getAtomicLong(VERIFICATION_STATS_PREFIX + ":" + field)
+        .incrementAndGet()
+        .doOnError(error -> log.error("Error incrementing stats for field: {}", field, error))
+        .subscribe(); // Fire and forget
+  }
+
+  /** Parse long value from Redis map value. */
+  private long parseLong(Object value) {
+    if (value == null) {
+      return 0L;
+    }
+    try {
+      return Long.parseLong(value.toString());
+    } catch (NumberFormatException e) {
+      log.warn("Failed to parse long value: {}", value);
+      return 0L;
+    }
+  }
+
+  // Data classes for verification service
+
+  @lombok.Data
+  @lombok.Builder
+  @lombok.NoArgsConstructor
+  @lombok.AllArgsConstructor
+  public static class VerificationTokenData {
+
+    private Long userId;
+    private String email;
+    private String userType;
+    private String token;
+    private LocalDateTime createdAt;
+    private LocalDateTime expiresAt;
+    private boolean isUsed;
+    private LocalDateTime usedAt;
+  }
+
+  @lombok.Data
+  @lombok.Builder
+  @lombok.NoArgsConstructor
+  @lombok.AllArgsConstructor
+  public static class VerificationTokenInfo {
+
+    private String token;
+    private LocalDateTime expiresAt;
+    private String verificationLink;
+  }
+
+  @lombok.Data
+  @lombok.Builder
+  @lombok.NoArgsConstructor
+  @lombok.AllArgsConstructor
+  public static class VerificationResult {
+
+    private boolean success;
+    private String message;
+    private Long userId;
+    private String email;
+    private String userType;
+    private VerificationStatus status;
+
+    public static VerificationResult success(Long userId, String email, String userType) {
+      return VerificationResult.builder()
+          .success(true)
+          .message("Email verified successfully")
+          .userId(userId)
+          .email(email)
+          .userType(userType)
+          .status(VerificationStatus.SUCCESS)
+          .build();
+    }
+
+    public static VerificationResult invalid(String message) {
+      return VerificationResult.builder()
+          .success(false)
+          .message(message)
+          .status(VerificationStatus.INVALID)
+          .build();
+    }
+
+    public static VerificationResult expired(String message) {
+      return VerificationResult.builder()
+          .success(false)
+          .message(message)
+          .status(VerificationStatus.EXPIRED)
+          .build();
+    }
+
+    public static VerificationResult alreadyUsed(String message) {
+      return VerificationResult.builder()
+          .success(false)
+          .message(message)
+          .status(VerificationStatus.ALREADY_USED)
+          .build();
+    }
+
+    public static VerificationResult rateLimited(String message) {
+      return VerificationResult.builder()
+          .success(false)
+          .message(message)
+          .status(VerificationStatus.RATE_LIMITED)
+          .build();
+    }
+
+    public static VerificationResult error(String message) {
+      return VerificationResult.builder()
+          .success(false)
+          .message(message)
+          .status(VerificationStatus.ERROR)
+          .build();
+    }
+  }
+
+  public enum VerificationStatus {
+    SUCCESS,
+    INVALID,
+    EXPIRED,
+    ALREADY_USED,
+    RATE_LIMITED,
+    ERROR,
+  }
+
+  @lombok.Data
+  @lombok.Builder
+  @lombok.NoArgsConstructor
+  @lombok.AllArgsConstructor
+  public static class VerificationStats {
+
+    private long tokensGenerated;
+    private long tokensVerified;
+    private long tokensExpired;
+    private long tokensAlreadyUsed;
+    private long tokensInvalidated;
+    private long rateLimitedAttempts;
+    private long validationErrors;
+  }
+}

@@ -1,0 +1,29 @@
+name: ECR Deploy
+
+on:
+  push:
+    branches: [cloud]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO: uniflow-app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+      - run: |
+          ECR_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}
+          docker pull $ECR_URI:latest 2>/dev/null && docker tag $ECR_URI:ec2 $ECR_URI:backup || true
+          docker push $ECR_URI:backup || true
+          docker build -t uniflow-app .
+          docker tag uniflow-app $ECR_URI:latest
+          docker push $ECR_URI:latest

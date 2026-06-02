@@ -1,0 +1,494 @@
+{
+  "name": "Cover Letter RAG",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "coverletterrag",
+          "mode": "list",
+          "cachedResultName": "coverletterrag"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        64
+      ],
+      "id": "c215a8c8-09f5-4402-80dd-3e1c6972c69a",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+        "pineconeApi": {
+          "id": "RLDkxW3Z6QJghq5G",
+          "name": "Cover Letter Pinecone API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1008,
+        304
+      ],
+      "id": "efad483f-9e09-4b7c-bfb1-c9c93b102780",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "chunkSize": 500,
+        "chunkOverlap": 200,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        480
+      ],
+      "id": "25a69d50-bea2-464b-b9be-51a724564b2e",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert Germany Student Visa Documentation Assistant.\n\n--------------------------------------------------\nCRITICAL: DIRECT ONE-SHOT GENERATION ONLY (NON-INTERACTIVE)\n--------------------------------------------------\n- You are a one-shot generation agent. You MUST NOT ask questions, request missing details, or carry out a conversation.\n- Even if fields are missing, empty, or null, you MUST silently omit them and generate the final cover letter text immediately using only what is provided.\n- Under no circumstances should you output responses like 'I am ready to generate the cover letter, but I need...' or list missing details.\n- Your response must begin directly with the Date line of the cover letter.\n- If you fail to generate the full letter directly, the execution is invalid.\n\nThis task MUST use Retrieval-Augmented Generation (RAG) with a Pinecone vector database that contains REAL, APPROVED German student visa cover letters.\n\n--------------------------------------------------\nHARD OUTPUT CONTRACT (NON-NEGOTIABLE)\n--------------------------------------------------\n\n- The token <<<FINAL_OUTPUT>>> is a CONTROL MARKER ONLY.\n- The token <<<FINAL_OUTPUT>>> MUST NEVER appear\n  in the visible output.\n\n- The model MUST generate all internal reasoning\n  BEFORE this token.\n\n- The visible response MUST contain ONLY the text\n  that comes AFTER this token.\n\n- The first visible line of the response\n  MUST be the Date (DD/MM/YYYY).\n\n- If <<<FINAL_OUTPUT>>> appears anywhere in the\n  visible output, the response is INVALID.\n\n\n--------------------------------------------------\nMANDATORY RAG EXECUTION RULE (CRITICAL)\n--------------------------------------------------\n\nBEFORE generating the cover letter, you MUST:\n\n1. Query the Pinecone vector store for:\n   \"student visa cover letter\"\n\n2. Retrieve at least ONE relevant document and can retrieve many documents.\n\n3. Internally analyze the retrieved content ONLY for:\n   - Sentence length patterns\n   - Paragraph depth\n   - Embassy wording style\n   - Formal closing language\n\n4. If no document is retrieved:\n   - FALL BACK to conservative embassy-style language\n   - DO NOT shorten paragraphs\n   - DO NOT simplify intent or conclusion sections\n\n⚠️ NEVER mention Pinecone, RAG, vectors, or documents in the output.\n\n--------------------------------------------------\nSTRICT INPUT RULES (NON-NEGOTIABLE)\n--------------------------------------------------\n\n- Use ONLY the provided n8n JSON variables.\n- DO NOT invent, assume, or normalize missing data.\n- If a field is empty or null, OMIT it silently.\n- NEVER rewrite or correct user facts.\n\n--------------------------------------------------\nOUTPUT SUPPRESSION RULE (CRITICAL)\n--------------------------------------------------\n\n- The model MUST NOT output:\n  - thoughts\n  - reasoning\n  - plans\n  - analysis\n  - explanations\n  - internal steps\n  - comments\n  - reflections\n  - tool usage narration\n\n- Any internal reasoning MUST remain completely hidden.\n\n- The response MUST begin directly with the\n  formatted cover letter content.\n\n- If any text appears before the Date line,\n  the output is INVALID.\n\n- ONLY the final cover letter text is allowed\n  in the response.\n\n--------------------------------------------------\nDATE HANDLING (MANDATORY)\n--------------------------------------------------\n\n- Use {{ $json.body[\"submittedAt\"] }}\n- Format: DD/MM/YYYY\n- DO NOT use system date\n- Date must appear at the top\n\n--------------------------------------------------\nPERSONAL DATA ISOLATION RULE (CRITICAL)\n--------------------------------------------------\n\n- ALL personal, academic, financial, and identity information\n  MUST come ONLY from the provided n8n JSON form fields.\n\n- The Pinecone RAG context is STRICTLY LIMITED to:\n  - Writing style\n  - Sentence structure\n  - Paragraph flow\n  - Embassy tone\n  - Formal closing language\n\n- The RAG context MUST NEVER be used for:\n  - Names\n  - Email or phone numbers\n  - Passport numbers\n  - Addresses\n  - Academic institutions or marks\n  - Financial amounts or banks\n  - Sponsorship details\n  - Work experience\n  - Dates or durations\n\n- EVEN IF the RAG documents contain realistic personal data,\n  they MUST be treated as STYLE REFERENCES ONLY.\n\n- If any personal detail is not present in the JSON input,\n  it MUST be omitted entirely.\n  DO NOT infer or substitute from RAG examples.\n\n- The JSON form data is the SINGLE SOURCE OF TRUTH\n  for all factual content in the cover letter.\n\n--------------------------------------------------\nGERMANY VISA COMPLIANCE RULES\n--------------------------------------------------\n\n- Visa Type: **{{ $json.body['Visa Type'] }}** (Target Country: **{{ $json.body['Target Country'] }}**)\n- Purpose: Education only\n- Blocked Account: Mandatory mention.\n- Intent to Return: Mandatory and explicit\n- DO NOT mention PR, settlement, or employment in target country\n- DO NOT mention attachments or document lists\n\n--------------------------------------------------\nINTRODUCTION PARAGRAPH (STRICT TONE CONTROL)\n--------------------------------------------------\n\nThe introduction paragraph MUST be:\n\n- Declarative and factual\n- Admission-focused, NOT application-focused\n- Written as a formal embassy statement\n\nThe paragraph MUST include:\n- Student Name : **{{ $json.body['Student Name'] }}**\n- Gender: **{{ $json.body['Gender'] }}**\n- Passport Number : **{{ $json.body['Passport Number'] }}**\n- Nationality: **{{ $json.body['Nationality'] }}**\n- Course name : **{{ $json.body['Course Name'] }}**\n- University name : **{{ $json.body['University Name'] }}**\n- University Location : **{{ $json.body['University Location'] }}**\n- Course duration : **{{ $json.body['Course Duration'] }}**\n- Language of instruction (if available else keep English)\n- Course start date ONLY if provided : **{{ $json.body['Course Start Date'] }}**\n- Tuitions Fees ONLY if provided  : **{{ $json.body['Tuition Fees'] }}**\n- Visa Type : **{{ $json.body['Visa Type'] }}**\n- Target Country : **{{ $json.body['Target Country'] }}**\n\n- Use sentences like : \"The course duration is of\", \"The language of instruction of this program is\"\nSTRICTLY FORBIDDEN PHRASES:\n- \"I am writing to apply\"\n- \"I am applying for a student visa\"\n- \"to pursue my higher education\"\n- Any motivational or persuasive wording\n\nSTYLE GUIDANCE (NOT A TEMPLATE):\n- Prefer \"have been admitted to\"\n- Prefer simple present or present perfect tense\n- Keep the paragraph concise and factual\n- No enthusiasm, no justification, no intent statements\n\n--------------------------------------------------\nCOURSE START DATE FORMATTING RULE (STRICT)\n--------------------------------------------------\n\n- Use **{{ $json.body['Course Start Date'] }}** ONLY if provided.\n\n- IF the date is provided in full numeric format:\n  DD/MM/YYYY (e.g., 01/12/2025)\n  → Convert and display as:\n    \"December 1, 2025\"\n\n- IF the date is provided in month/year format:\n  MM/YYYY (e.g., 12/2025)\n  → Convert and display as:\n    \"December 2025\"\n\n- IF the date is provided in any other incomplete form:\n  → Display ONLY the available components\n    without guessing or adding missing parts.\n\n- DO NOT display the date in numeric format\n  in the final cover letter.\n\n- DO NOT infer or assume a day if it is not provided.\n\n- The formatted date MUST appear naturally\n  within the introduction paragraph sentence.\n\n--------------------------------------------------\nTUITION FEE HANDLING (SINGLE CONDITION – MANDATORY)\n--------------------------------------------------\n\nTUITION FEE OVERRIDE RULE (HIGHEST PRIORITY)\n\n- If **{{ $json.body['Tuition Fees'] }}** is:\n  - null\n  - empty\n  - \"0\"\n  - 0\n  - \"0 EUR\"\n  - \"0 Euros\"\n\nTHEN:\n\n- **{{ $json.body['Tuition Fees'] }}** MUST be treated as\n  NOT PROVIDED.\n\n- ALL tuition-related sentences are STRICTLY FORBIDDEN.\n\n- The model MUST behave as if the Tuition Fees field\n  does NOT exist at all.\n\n- NO tuition fee wording, paraphrasing, or inference\n  is allowed in the output.\n\n\n- IF **{{ $json.body['Tuition Fees'] }}** is present:\n\n  Following sentences MUST be written\n  consecutively in the introduction paragraph:\n\n  \"The tuition fees for the course are **{{ $json.body['Tuition Fees'] }}** Euros per year, out of which I have already paid first year tuition fees (**{{ $json.body['Tuition Fees'] }}** Euros).\"\n\n- IF **{{ $json.body['Tuition Fees'] }}** is NOT present:\n  - OMIT ALL tuition-related statements entirely\n\n--------------------------------------------------\nPASSPORT NUMBER LINGUISTIC RULE (STRICT)\n--------------------------------------------------\n\nWhen mentioning the passport number:\n- Use ONLY neutral connectors such as:\n  \"with Passport No.\"\n  or a simple appositive mention.\n\nSTRICTLY FORBIDDEN WORDS:\n- \"holding\"\n- \"bearing\"\n- \"possessing\"\n- \"carrying\"\n\nThe passport number must NOT be described\nas something the student is \"holding\".\n\nThe paragraph should read like a formal declaration\nof admission details rather than a request.\n\n--------------------------------------------------\nLANGUAGE & STYLE RULES\n--------------------------------------------------\n\n- First person singular (\"I\")\n- Formal, declarative, embassy-style English\n- NO persuasive language\n- NO emotional wording\n- NO marketing tone\n- NO academic praise\n\n--------------------------------------------------\nFINANCIAL PARAGRAPH RULES (STRICT – HUMAN MIRROR)\n--------------------------------------------------\n\nThis paragraph MUST follow the natural sentence flow used in approved German student visa cover letters.\n\nFIRST SENTENCE RULE (MANDATORY ORDER):\n- The FIRST sentence MUST describe the source of funds.\n- Sentence phrasing SHOULD be declarative, sponsored by sponsor name **{{ $json.body['Sponsor Name'] }}** and source of funds **{{ $json.body['Source of Funds'] }}**.\n\nSOURCE OF FUNDS LOGIC:\n- IF sponsorship or source of funds information is present in JSON:\n  → Use a sponsorship sentence reflecting **{{ $json.body['Sponsor Name'] }}** and source **{{ $json.body['Source of Funds'] }}**.\n- IF not present:\n  → State that the funds are provided by the student's father.\n\nYou can take reference of this example : \"The funds for my studies and the expenses during my stay in Germany will be sponsored by **{{ $json.body['Sponsor Name'] }}** under **{{ $json.body['Source of Funds'] }}**.\"\n\nSECOND SENTENCE RULE:\n- The SECOND sentence MUST describe the blocked account.\n- It MUST clearly indicate that the blocked account has been opened in bank name **{{ $json.body['Blocked Account Bank Name'] }}** having balance of **{{ $json.body['Blocked Account Balance'] }}**.\n\nFACTUAL INTEGRITY RULES (CRITICAL):\n- Numeric values MUST be reproduced EXACTLY as provided in JSON.\n- DO NOT recalculate, approximate, round, or substitute amounts.\n- DO NOT introduce alternate numeric values from RAG context.\n\nLINGUISTIC CONSTRAINTS:\n- Use TWO separate sentences.\n- DO NOT merge sponsorship and blocked account information.\n- DO NOT add explanations, justifications, or interpretations.\n- DO NOT use action-focused wording such as:\n  \"I have deposited\"\n  \"I deposited\"\n  \"I transferred\"\n- Prefer account-status wording such as:\n  \"has already been opened\"\n  as reflected in approved cover letters.\n\n- DO NOT add phrases like:\n  \"to cover expenses\"\n  \"for financial support\"\n  \"as per requirements\"\n  unless they exist verbatim in JSON.\n- Do not include words like \"containing\", instead use words like \"having balance of\"\n\nThe paragraph must read like a human-written, embassy-style declaration, not a summarized, optimized, or narrative financial statement.\n\n--------------------------------------------------\nACADEMIC PARAGRAPH RULES\n--------------------------------------------------\n\n- ONE single paragraph, separate sentence for all education type, all sentence should be not same in structure means all sentences should looks like connecting and being one paragraph.\n- Chronological order: \n    SSC →\n    (HSC OR Diploma) →\n    Bachelors →\n    Masters\n\nRULES:\n- SSC is mandatory\n- Either HSC or Diploma is mandatory\n- Bachelors is optional\n- Masters is optional\n- If any level is missing, OMIT it entirely\n- If current company **{{ $json.body['Current Company'] }}** is provided, mention the student's professional history/employment.\n- If gap reason **{{ $json.body['Gap Reason'] }}** is provided, explain the gap period formally and professionally.\n\nUSE THESE FIELDS ONLY:\n\nSSC:\n- **{{ $json.body['SSC School Name'] }}** (optional)\n- **{{ $json.body['SSC Passing Month and Year'] }}**\n- **{{ $json.body['SSC Marks or Percentage'] }}**\n\nHSC (use ONLY if present):\n- **{{ $json.body['HSC School Name'] }}** (optional)\n- **{{ $json.body['HSC Passing Month and Year'] }}**\n- **{{ $json.body['HSC Marks or Percentage'] }}**\n\nDiploma (use ONLY if HSC not present):\n- {{ $json.body['Diploma University Name'] }}\n- {{ $json.body['Diploma Course Name'] }}\n- {{ $json.body['Diploma Course Start'] }} (optional)\n- {{ $json.body['Diploma Course End'] }}\n- {{ $json.body['Diploma Course Percentage or CGPA'] }}\n\nBachelors (optional):\n- **{{ $json.body['Bachelors University Name'] }}**\n- **{{ $json.body['Bachelors Course Name'] }}**\n- {{ $json.body['Bachelors Course Start'] }} (optional)\n- {{ $json.body['Bachelors Course End'] }}\n- **{{ $json.body['Bachelors Course Percentage or CGPA'] }}**\n\nMasters (optional):\n- {{ $json.body['Masters University Name'] }}\n- {{ $json.body['Masters Course Name'] }}\n- {{ $json.body['Masters Course Start'] }} (optional)\n- {{ $json.body['Masters Course End'] }}\n- {{ $json.body['Masters Course Percentage or CGPA'] }}\n\nDEGREE DURATION FORMATTING RULE (MANDATORY)\n\n- If BOTH start year/month and end year/month are provided\n  for Diploma, Bachelors, or Masters:\n\n  → The sentence MUST explicitly state duration as:\n    \"from {{ start }} to {{ end }}\"\n\n- DO NOT summarize such cases as:\n  \"completed in {{ end }}\"\n  or\n  \"graduated in {{ end }}\"\n\n- If ONLY end date is provided:\n  → Use completion-only phrasing.\n\n- If start date is provided but end date is missing:\n  → Omit duration wording entirely.\n\n- Facts only: institution, dates, marks/CGPA\n- For SSC and HSC, if Marks or percentage field does not contain % symbol then add % at end of number.\n- For Diploma, Bachelors and Masters if percentage or cgpa field does not contain cgpa word then add CGPA at the end of number.\n- NO tables, bullets, or headings\n- NO adjectives or achievements\n\n--------------------------------------------------\nFINAL THREE PARAGRAPHS (MANDATORY HUMAN STYLE)\n--------------------------------------------------\n\nThe final three paragraphs MUST be written as three separate, complete, natural sentences, appearing one after another as individual paragraphs.\n\nPARAGRAPH 1: ACADEMIC CONTEXT + INTENT TO RETURN\n- Written as ONE paragraph containing EXACTLY TWO sentences.\n- The FIRST sentence MUST state a neutral academic context\n  referring to Germany’s educational environment, and accommodation details **{{ $json.body['Accommodation Details'] }}** if provided.\n- The academic context MUST be factual and non-emotional.\n- The SECOND sentence MUST clearly state the intent to return\n  to India after successful completion of studies, and the future return plan **{{ $json.body['Future Return Plan'] }}**.\n- The return intent MUST be explicit and not implied.\n- The second sentence MUST express contribution to India\n  using the knowledge gained during studies.\n- SHOULD include a domain- or field-specific area of contribution\n  when it naturally aligns with the course\n  (e.g., information technologies), using simple language.\n- Tone must remain human, forward-looking, and practical,\n  consistent with real approved visa letters.\n\nSTRICTLY FORBIDDEN:\n- Cultural admiration\n- Emotional wording\n- Country praise\n- Words such as:\n  \"wonderful\", \"blessing\", \"world-class\",\n  \"highest level\", or similar\n\nPARAGRAPH 2: VISA REQUEST\n- Written as ONE complete sentence only.\n- The sentence MUST explicitly request the grant of a\n  student visa for target country.\n- The sentence MAY mention the opportunity to pursue\n  studies or learning.\n- The sentence MAY mention personal or professional\n  development, using simple and natural wording.\n- The sentence MUST remain factual, polite, and respectful.\n- The sentence MUST NOT include:\n  - Policy references\n  - Legal language\n  - Motivational or persuasive tone\n  - Emotional or aspirational wording\n- The sentence MUST NOT mention future employment,\n  settlement, or stay in Germany.\n\nSTYLE REFERENCE (STYLE ONLY, NOT CONTENT):\n\"I kindly request you to grant me a student visa to allow\nme this opportunity to pursue my studies and continue\nmy professional development.\"\n\nPARAGRAPH 3: COURTESY CLOSING\n- Written as ONE short, complete sentence only.\n- The sentence MUST express gratitude using\n  standard embassy-style language.\n- The sentence MUST NOT introduce any new facts,\n  intentions, or requests.\n- The sentence MUST remain neutral, polite,\n  and non-emotional.\n- The sentence MUST avoid legal or regulatory phrasing.\n- The sentence MUST avoid overly formal or robotic wording.\n\nSTYLE REFERENCE (STYLE ONLY, NOT CONTENT):\n\"Thanking you in advance for your cooperation.\"\n\nSTRICTLY FORBIDDEN:\n- Multi-sentence output\n- Bullet-style phrasing\n- Requests, explanations, or justifications\n- Policy, legal, or procedural language\n\n--------------------------------------------------\nMANDATORY OUTPUT SEQUENCE (NON-NEGOTIABLE)\n--------------------------------------------------\n\n1. Date (DD/MM/YYYY)\n2. Address Block\n- You can keep this address of germany office : \nTo,\nThe Visa Officer,\nThe Consulate General of Federal Republic of Germany,\nMumbai.\n\n3. Subject Line\n- DO not provide it in bold format.\n4. Salutation\n5. Introduction Paragraph (it should include course start date if it is provided by the user)\n6. Financial Paragraph\n7. Academic Background Paragraph\n8. Academic Context + Intent to Return Paragraph\n9. Visa Request Paragraph\n10. Courtesy Closing Line\n11. Signature Block\n\n--------------------------------------------------\nOUTPUT SUPPRESSION RULE (CRITICAL)\n--------------------------------------------------\n\n- The model MUST NOT output:\n  - thoughts\n  - reasoning\n  - plans\n  - analysis\n  - explanations\n  - internal steps\n  - comments\n  - reflections\n  - tool usage narration\n\n- Any internal reasoning MUST remain completely hidden.\n\n- The only letter response MUST begin directly with the\n  formatted cover letter content.\n\n- If any text appears before the Date line,\n  the output is INVALID.\n\n- ONLY the final cover letter text is allowed\n  in the response.\n\n--------------------------------------------------\nFINAL OUTPUT RULES\n--------------------------------------------------\n\n- Output ONLY the final cover letter text\n- NO markdown\n- NO explanations\n- NO metadata\n- Must be directly usable in Word (.docx)\n\n--------------------------------------------------\nCLOSING FORMAT (FIXED)\n--------------------------------------------------\n\nYours Sincerely,\n**{{ $json.body['Student Name'] }}**\n\n<<<FINAL_OUTPUT>>>",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        560,
+        768
+      ],
+      "id": "96e3800c-a144-408a-92df-4f01d341232f",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Retrieve the data when AI agent asks for",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "coverletterrag",
+          "mode": "list",
+          "cachedResultName": "coverletterrag"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        752,
+        960
+      ],
+      "id": "18db8b86-4c2c-4faa-b3f5-1c755858f6ef",
+      "name": "Pinecone Vector Store1",
+      "credentials": {
+        "pineconeApi": {
+          "id": "RLDkxW3Z6QJghq5G",
+          "name": "Cover Letter Pinecone API"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        64,
+        48
+      ],
+      "id": "d846ee3f-6b71-400c-98a4-39358327981b",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        544,
+        48
+      ],
+      "id": "958a328b-af4c-414d-b2a7-457ffc8cb933",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "gsD0oAsC9YOLpJR4",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        752,
+        48
+      ],
+      "id": "a7e42bd9-ab00-41a0-914e-c19d5d537445",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        560,
+        976
+      ],
+      "id": "11a5a71d-a3f7-4ffb-97b9-020a0055bf58",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "wwPu8UJY4nqNlGR4",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "sentence-transformers/all-mpnet-base-v2",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        752,
+        1136
+      ],
+      "id": "c9e4da28-2319-4279-ad1a-5cca4ec81c6a",
+      "name": "Embeddings HuggingFace Inference",
+      "credentials": {
+        "huggingFaceApi": {
+          "id": "ajzHFxUagUv7Ui1y",
+          "name": "Cover Letter Hugging Face API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "sentence-transformers/all-mpnet-base-v2",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        880,
+        304
+      ],
+      "id": "6c048148-4009-4518-887c-4aa0f85093de",
+      "name": "Embeddings HuggingFace Inference1",
+      "credentials": {
+        "huggingFaceApi": {
+          "id": "ajzHFxUagUv7Ui1y",
+          "name": "Cover Letter Hugging Face API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "coverletter",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        768
+      ],
+      "id": "0c4f7bde-8003-4098-9174-29f5c8b3403b",
+      "name": "Webhook",
+      "webhookId": "7b7ce3ef-f5df-4e9f-ad08-d5a24f88b211"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: $json.success, generatedCoverLetter: $json.generatedCoverLetter }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        768
+      ],
+      "id": "ad2b9ffc-1dc0-46c5-a5bd-ab26375d7f9f",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": ".pdf",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "1MPp1-FsIK7uGkorDVMszN61vtOAfExrh",
+            "mode": "list",
+            "cachedResultName": "Cover Letter Knowledge Base",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1MPp1-FsIK7uGkorDVMszN61vtOAfExrh"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        320,
+        48
+      ],
+      "id": "17ee1257-d04c-4cb6-bdaa-89fed99afa6d",
+      "name": "Search files and folders",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "gsD0oAsC9YOLpJR4",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Data Ingestion Workflow",
+        "height": 656,
+        "width": 1360
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "fe6bf110-fcc0-4074-b7e1-71cd60819952",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Cover Letter Generation Workflow",
+        "height": 592,
+        "width": 928
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        224,
+        720
+      ],
+      "typeVersion": 1,
+      "id": "e53fd1a4-04d9-49a1-b8f7-db8ccb8c80d2",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// Cover Letter Output Sanitizer\n// Strips any AI reasoning / tool-call narration that appears before the date.\n// Also detects the \"asking for data\" failure mode and returns a safe fallback.\n// ─────────────────────────────────────────────────────────────────────────────\n\nconst raw = items[0].json.output\n  || items[0].json.text\n  || items[0].json.result\n  || '';\n\n// ── Detect failure mode: AI asked for more data instead of generating ──────\nconst askingForData = /please provide|i need the|to generate the cover letter|provide the json|can you share|provide.*fields|i'll need/i.test(raw);\nif (askingForData) {\n  return [{\n    json: {\n      success: false,\n      generatedCoverLetter: raw,\n      _note: 'AI requested additional data. Check n8n prompt rules.'\n    }\n  }];\n}\n\n// ── Strip preamble: find first line that starts with a date DD/MM/YYYY ──────\nconst lines = raw.split('\\n');\nlet dateLineIndex = -1;\nfor (let i = 0; i < lines.length; i++) {\n  // Allow optional whitespace before the date\n  if (/^\\s*\\d{2}\\/\\d{2}\\/\\d{4}/.test(lines[i])) {\n    dateLineIndex = i;\n    break;\n  }\n}\n\nlet clean = raw.trim();\nif (dateLineIndex > 0) {\n  clean = lines.slice(dateLineIndex).join('\\n').trim();\n}\n\nreturn [{\n  json: {\n    success: true,\n    generatedCoverLetter: clean,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        768
+      ],
+      "id": "sanitize-cover-letter-output-001",
+      "name": "Sanitize Output"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Search files and folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Sanitize Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings HuggingFace Inference": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings HuggingFace Inference1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search files and folders": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanitize Output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0a50afa6-41a6-486b-b52a-10a8314ef84f",
+  "meta": {
+    "instanceId": "d57e2d7c93e52cdb902ab43ddb3c518f4167b13d72edbdc9d74758f6091c72a8"
+  },
+  "id": "2iOnEH5yxVzO5JcU",
+  "tags": []
+}

@@ -1,0 +1,485 @@
+# UniFLow Consolidated Platform - Simplified Configuration (PostgreSQL Only)
+spring:
+  application:
+    name: uniflow-consolidated
+
+  # Explicitly disable JDBC DataSource auto-configuration (keep Liquibase enabled)
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+      - org.redisson.spring.starter.RedissonAutoConfiguration
+      - org.redisson.spring.starter.RedissonAutoConfigurationV2
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+      # Exclude validator only — lets JavaMailSender bean exist without testing connection at startup
+      - org.springframework.boot.autoconfigure.mail.MailSenderValidatorAutoConfiguration
+
+  profiles:
+    default: dev-aws
+    active: ${SPRING_PROFILES_ACTIVE:dev-aws}
+  main:
+    lazy-initialization: false
+    banner-mode: console
+
+  # Jackson Configuration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+    date-format: yyyy-MM-dd'T'HH:mm:ss
+    time-zone: UTC
+    default-property-inclusion: non_null
+
+  # WebFlux Configuration
+  webflux:
+    # Removed base-path - will use higher-level routing in RouterConfig
+
+  # R2DBC Database Configuration
+  r2dbc:
+    url: ${SPRING_R2DBC_URL:r2dbc:postgresql://localhost:5432/uniflow_db_dev}
+    username: ${SPRING_R2DBC_USERNAME:uniflow}
+    password: ${SPRING_R2DBC_PASSWORD:uniflow_admin}
+    pool:
+      enabled: true
+      initial-size: 10
+      max-size: 50
+      max-idle-time: PT30M
+      validation-query: SELECT 1
+
+  # Redis Configuration - Disabled
+  data:
+    redis:
+      enabled: false
+
+  # JDBC DataSource Configuration (for Liquibase)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/uniflow_db_dev
+    username: uniflow
+    password: uniflow_admin
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      leak-detection-threshold: 60000
+      validation-timeout: 5000
+      connection-test-query: SELECT 1
+
+  # Liquibase Configuration for migrations
+  liquibase:
+    enabled: true
+    url: jdbc:postgresql://localhost:5432/uniflow_db_dev
+    user: uniflow
+    password: uniflow_admin
+    change-log: db/changelog/db.changelog-master.xml
+    drop-first: false
+
+  # Security Configuration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:}
+
+  # Spring Mail (SMTP) for Contact Us email notifications
+  mail:
+    host: ${MAIL_SMTP_HOST:smtp.gmail.com}
+    port: ${MAIL_SMTP_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  netty:
+    connection-timeout: 20s
+    h2c-max-content-length: 0B
+    max-initial-line-length: 4KB
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+
+# Management/Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      show-components: always
+    info:
+      enabled: true
+  info:
+    env:
+      enabled: true
+    build:
+      enabled: true
+    git:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET}  # must be set as env var — no fallback default
+  expiration: ${JWT_EXPIRATION:360000000} # 100 hour
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
+  issuer: ${JWT_ISSUER:uniflow-platform}
+  audience: ${JWT_AUDIENCE:uniflow-client}
+
+# OpenAPI Documentation
+springdoc:
+  api-docs:
+    enabled: true
+    path: /api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    config-url: /api-docs/swagger-config
+    urls-primary-name: UniFLow Platform API
+    display-request-duration: true
+    groups-order: desc
+  packages-to-scan: com.uniflow
+  paths-to-match: /api/v1/**
+
+# Logging Configuration
+logging:
+  level:
+    com.uniflow: INFO
+    # org.springframework.r2dbc: DEBUG
+    # org.springframework.data.r2dbc: DEBUG
+    # io.r2dbc.postgresql: DEBUG
+    # com.zaxxer.hikari: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+#  file:
+#    name: logs/uniflow-consolidated.log
+#    max-size: 100MB
+#    max-history: 30
+
+# Application Specific Configuration
+uniflow:
+  cors:
+    allowed-origins: ${UNIFLOW_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: "*"
+    allow-credentials: true
+    max-age: 3600
+
+  file-upload:
+    max-size: ${UNIFLOW_FILE_UPLOAD_MAX_SIZE:10MB}
+    allowed-types: pdf,doc,docx,jpg,jpeg,png
+    upload-dir: ${UNIFLOW_UPLOAD_DIR:./uploads}
+
+  # AWS S3 Configuration
+  aws:
+    s3:
+      bucket-name: ${AWS_S3_BUCKET_NAME:uni360-documents-dev-aws-817100478450-ap-southeast-2-an}
+      region: ${AWS_S3_REGION:ap-southeast-2}
+      access-key: ${AWS_ACCESS_KEY_ID}  # set via EC2 env var or IAM role
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+      document-path: ${AWS_S3_DOCUMENT_PATH:documents/}
+      max-file-size: ${AWS_S3_MAX_FILE_SIZE:10MB}
+      allowed-types: ${AWS_S3_ALLOWED_TYPES:pdf,doc,docx,jpg,jpeg,png}
+      presigned-url-expiration: ${AWS_S3_PRESIGNED_URL_EXPIRATION:3600}
+
+  # Notification System Configuration
+  notifications:
+    enabled: ${UNIFLOW_NOTIFICATIONS_ENABLED:true}
+    websocket:
+      enabled: ${UNIFLOW_WEBSOCKET_ENABLED:true}
+      path: ${UNIFLOW_WEBSOCKET_PATH:/ws/notifications}
+      allowed-origins: ${UNIFLOW_WEBSOCKET_ORIGINS:*}
+    rate-limit:
+      max-per-minute: ${UNIFLOW_NOTIFICATION_RATE_LIMIT:60}
+      window-minutes: ${UNIFLOW_NOTIFICATION_WINDOW:1}
+
+  # Verification Service Configuration
+  verification:
+    token-expiry-hours: ${UNIFLOW_VERIFICATION_TOKEN_EXPIRY_HOURS:24}
+    max-attempts: ${UNIFLOW_VERIFICATION_MAX_ATTEMPTS:5}
+    attempt-window-minutes: ${UNIFLOW_VERIFICATION_ATTEMPT_WINDOW_MINUTES:60}
+
+  # Base URL for verification links (configurable per environment)
+  base-url: ${UNIFLOW_BASE_URL:http://localhost:8080}
+
+# Razorpay Payment Configuration
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:YOUR_RAZORPAY_KEY_ID}
+  key-secret: ${RAZORPAY_KEY_SECRET:YOUR_RAZORPAY_KEY_SECRET}
+  default-amount: ${RAZORPAY_AMOUNT:100}   # Amount in paise (100 = ₹1)
+  default-currency: ${RAZORPAY_CURRENCY:INR}
+
+
+# Superadmin email for contact-form notifications
+app:
+  superadmin:
+    email: ${SUPERADMIN_EMAIL:admin@uni360degree.com}
+
+  # Client Workflow Configuration System
+  client:
+    id: ${UNIFLOW_CLIENT_ID:uni360}
+    config-path: ${UNIFLOW_CLIENT_CONFIG_PATH:classpath:config/clients}
+    auto-load: ${UNIFLOW_CLIENT_AUTO_LOAD:true}
+    validation:
+      strict: ${UNIFLOW_CLIENT_VALIDATION_STRICT:true}
+      fail-on-error: ${UNIFLOW_CLIENT_VALIDATION_FAIL_ON_ERROR:true}
+
+  # Profile Builder Configuration System
+  profile-builder:
+    config-path: ${UNIFLOW_PROFILE_BUILDER_CONFIG_PATH:classpath:config/profile-builder-config-n8n.yml}
+    auto-load: ${UNIFLOW_PROFILE_BUILDER_AUTO_LOAD:true}
+    fail-on-error: ${UNIFLOW_PROFILE_BUILDER_FAIL_ON_ERROR:false}
+
+  # Authentication Configuration
+  auth:
+    # Master verification token for testing - bypasses all verification checks
+    master-verify-token: ${UNIFLOW_MASTER_VERIFY_TOKEN:MASTER_VERIFY_TOKEN}
+
+    # Google OAuth Configuration
+    google:
+      oauth:
+        enabled: ${GOOGLE_OAUTH_ENABLED:true}
+        client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+        client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+        redirect-uri: ${GOOGLE_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/google/callback}
+        scope: ${GOOGLE_OAUTH_SCOPE:openid profile email}
+        state-token-ttl: ${GOOGLE_OAUTH_STATE_TTL:300000}
+        max-attempts-per-ip: ${GOOGLE_OAUTH_MAX_ATTEMPTS:5}
+        rate-limit-window: ${GOOGLE_OAUTH_RATE_LIMIT_WINDOW:3600000}
+
+
+# Profile-specific configurations
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+    add-properties: false
+  # AI SOP Generation Configuration
+
+  data:
+    redis:
+      enabled: false
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/uniflow_db_dev
+    username: uniflow
+    password: uniflow_admin
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      leak-detection-threshold: 60000
+      validation-timeout: 5000
+      connection-test-query: SELECT 1
+
+logging:
+  level:
+    root: INFO
+#    com.uniflow: DEBUG
+#    org.springframework.security: DEBUG
+
+uniflow:
+  cors:
+    allowed-origins: "*"
+  cache:
+    enabled: false # Disabled as Redis removed
+  base-url: http://localhost:8080
+  aws:
+    s3:
+      bucket-name: uni360-documents-dev-aws-817100478450-ap-southeast-2-an
+      region: ap-southeast-2
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+      document-path: documents/
+      max-file-size: 10MB
+      allowed-types:
+        - pdf
+        - doc
+        - docx
+        - jpg
+        - jpeg
+        - png
+      presigned-url-expiration: 3600
+  auth:
+    google:
+      oauth:
+        enabled: true
+        client-id: ${GOOGLE_OAUTH_CLIENT_ID}
+        client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET}
+        redirect-uri: http://localhost:8080/api/v1/auth/google/callback
+        frontend-redirect-uri: http://localhost:5173/auth/callback
+        scope: openid profile email
+        state-token-ttl: 300000
+        max-attempts-per-ip: 5
+        rate-limit-window: 3600000
+        # For testing with public IP locally, uncomment:
+        # redirect-uri: http://34.230.50.74:8080/api/v1/auth/google/callback
+  ai:
+    n8n:
+      base-url: ${UNIFLOW_AI_N8N_BASE_URL:http://localhost:5678}
+      sop-endpoint: /webhook/sop-generator
+      lor-endpoint: /webhook/lor-generator
+      cover-letter-endpoint: /webhook/coverletter
+      timeout: 120s
+      webhook-secret: ${UNIFLOW_AI_N8N_WEBHOOK_SECRET:uniflow-n8n-secret-2025}
+    ollama:
+      base-url: ${UNIFLOW_AI_OLLAMA_BASE_URL:http://localhost:11434}
+      timeout: ${UNIFLOW_AI_OLLAMA_TIMEOUT:60s}
+      enabled: ${UNIFLOW_AI_ENABLED:true}
+    default-model: qwen3:1.7b
+    sop-temperature: ${UNIFLOW_AI_SOP_TEMPERATURE:0.7}
+    max-retries: ${UNIFLOW_AI_MAX_RETRIES:3}
+    circuit-breaker:
+      enabled: ${UNIFLOW_AI_CIRCUIT_BREAKER_ENABLED:true}
+      failure-threshold: ${UNIFLOW_AI_FAILURE_THRESHOLD:5}
+      timeout: ${UNIFLOW_AI_CIRCUIT_TIMEOUT:30s}
+---
+spring:
+  config:
+    activate:
+      on-profile: dev-aws
+
+  # R2DBC Database Configuration for AWS RDS
+  r2dbc:
+    url: ${SPRING_R2DBC_URL}       # e.g. r2dbc:postgresql://uniflow-db.xxx.rds.amazonaws.com:5432/uniflow?sslmode=require
+    username: ${SPRING_R2DBC_USERNAME}
+    password: ${SPRING_R2DBC_PASSWORD}
+    pool:
+      enabled: true
+      initial-size: 10
+      max-size: 50
+      max-idle-time: PT30M
+      validation-query: SELECT 1
+
+  # JDBC DataSource Configuration for AWS RDS (for Liquibase)
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}  # e.g. jdbc:postgresql://uniflow-db.xxx.rds.amazonaws.com:5432/uniflow?sslmode=require
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      leak-detection-threshold: 60000
+      validation-timeout: 5000
+      connection-test-query: SELECT 1
+
+  # Liquibase Configuration for AWS RDS
+  liquibase:
+    enabled: true
+    url: ${SPRING_DATASOURCE_URL}
+    user: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    change-log: db/changelog/db.changelog-master.xml
+    drop-first: false
+
+  # Redis disabled for dev-aws
+  data:
+    redis:
+      enabled: false
+      
+logging:
+  level:
+    root: INFO
+    com.uniflow: INFO
+
+# Disable Swagger/OpenAPI in production
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+uniflow:
+  cors:
+    allowed-origins: "https://uni-360-students-portal.vercel.app,https://uni360degree.com,https://*.vercel.app"
+  cache:
+    enabled: false # Disabled as Redis removed
+  base-url: https://backend.uni360degree.com
+  client:
+    auto-load: true # Enable auto-load for workflow definitions
+  aws:
+    s3:
+      bucket-name: uni360-documents-dev-aws-817100478450-ap-southeast-2-an
+      region: ap-southeast-2
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+      document-path: documents/
+      max-file-size: 10MB
+      allowed-types:
+        - pdf
+        - doc
+        - docx
+        - jpg
+        - jpeg
+        - png
+      presigned-url-expiration: 3600
+  auth:
+    master-verify-token: ${UNIFLOW_MASTER_VERIFY_TOKEN}
+    google:
+      oauth:
+        enabled: true
+        client-id: ${GOOGLE_OAUTH_CLIENT_ID}
+        client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET}
+        redirect-uri: https://backend.uni360degree.com/api/v1/auth/google/callback
+        frontend-redirect-uri: https://uni-360-students-portal.vercel.app/auth/callback
+        scope: openid profile email
+        state-token-ttl: 300000
+        max-attempts-per-ip: 5
+        rate-limit-window: 3600000
+
+  # AI SOP Generation Configuration
+  ai:
+    n8n:
+      base-url: ${UNIFLOW_AI_N8N_BASE_URL:http://localhost:5678}
+      sop-endpoint: /webhook/sop-generator
+      lor-endpoint: /webhook/lor-generator
+      cover-letter-endpoint: /webhook/coverletter
+      timeout: 120s
+      webhook-secret: ${UNIFLOW_AI_N8N_WEBHOOK_SECRET:uniflow-n8n-secret-2025}
+    ollama:
+      base-url: ${UNIFLOW_AI_OLLAMA_BASE_URL:http://localhost:11434}
+      timeout: ${UNIFLOW_AI_OLLAMA_TIMEOUT:120s}
+      enabled: ${UNIFLOW_AI_ENABLED:true}
+    default-model: qwen3:1.7b
+    sop-temperature: ${UNIFLOW_AI_SOP_TEMPERATURE:0.7}
+    max-retries: ${UNIFLOW_AI_MAX_RETRIES:3}
+    circuit-breaker:
+      enabled: ${UNIFLOW_AI_CIRCUIT_BREAKER_ENABLED:true}
+      failure-threshold: ${UNIFLOW_AI_FAILURE_THRESHOLD:5}
+      timeout: ${UNIFLOW_AI_CIRCUIT_TIMEOUT:30s}

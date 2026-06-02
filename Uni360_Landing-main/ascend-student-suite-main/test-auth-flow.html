@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Auth Flow</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button.secondary {
+            background: #2196F3;
+        }
+        button.secondary:hover {
+            background: #0b7dda;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .token-display {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Backend Authentication Flow Test</h1>
+        <p><strong>Backend URL:</strong> http://34.230.50.74:8080</p>
+        
+        <div class="section">
+            <h2>Step 1: Login</h2>
+            <p>Enter credentials to get access token from backend:</p>
+            <input type="text" id="email" placeholder="Email or Username" value="test@example.com">
+            <input type="password" id="password" placeholder="Password" value="">
+            <button onclick="testLogin()">🔑 Login & Get Token</button>
+            <div id="loginResult"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Step 2: Current Token</h2>
+            <p>Token stored in localStorage:</p>
+            <div id="tokenDisplay" class="token-display">No token yet</div>
+            <button class="secondary" onclick="checkToken()">🔍 Check Token</button>
+            <button class="secondary" onclick="clearToken()">🗑️ Clear Token</button>
+        </div>
+        
+        <div class="section">
+            <h2>Step 3: Test Protected Endpoint</h2>
+            <p>Try to access protected API with the token:</p>
+            <button class="secondary" onclick="testProtectedEndpoint()">📊 Get Profile Steps</button>
+            <button class="secondary" onclick="testDocumentStatus()">📄 Get Document Status</button>
+            <div id="protectedResult"></div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://34.230.50.74:8080';
+        const TOKEN_KEY = 'uni360_access_token';
+        
+        function showResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="result ${type}">${content}</div>`;
+        }
+        
+        function getToken() {
+            return localStorage.getItem(TOKEN_KEY);
+        }
+        
+        function setToken(token) {
+            localStorage.setItem(TOKEN_KEY, token);
+            checkToken();
+        }
+        
+        function clearToken() {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem('uni360_refresh_token');
+            localStorage.removeItem('uni360_user');
+            checkToken();
+            showResult('loginResult', '✅ Token cleared from localStorage', 'success');
+        }
+        
+        function checkToken() {
+            const token = getToken();
+            const display = document.getElementById('tokenDisplay');
+            
+            if (token) {
+                try {
+                    // Decode JWT to show info
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const expiry = new Date(payload.exp * 1000);
+                    const isExpired = expiry < new Date();
+                    
+                    display.innerHTML = `
+                        <strong>✅ Token exists</strong><br><br>
+                        <strong>Token:</strong> ${token.substring(0, 50)}...<br>
+                        <strong>Expires:</strong> ${expiry.toLocaleString()}<br>
+                        <strong>Status:</strong> ${isExpired ? '❌ EXPIRED' : '✅ Valid'}<br>
+                        <strong>User ID:</strong> ${payload.sub || payload.userId || 'N/A'}
+                    `;
+                } catch (e) {
+                    display.innerHTML = `<strong>⚠️ Token exists but can't decode</strong><br>${token.substring(0, 100)}...`;
+                }
+            } else {
+                display.innerHTML = '<strong>❌ No token in localStorage</strong>';
+            }
+        }
+        
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showResult('loginResult', '❌ Please enter email and password', 'error');
+                return;
+            }
+            
+            showResult('loginResult', '⏳ Logging in...', 'info');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Client-ID': 'uniflow',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    body: JSON.stringify({
+                        usernameOrEmail: email,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    // Store token
+                    setToken(data.data.accessToken);
+                    if (data.data.refreshToken) {
+                        localStorage.setItem('uni360_refresh_token', data.data.refreshToken);
+                    }
+                    
+                    showResult('loginResult', `✅ Login Successful!
+
+Response:
+${JSON.stringify(data, null, 2)}
+
+✅ Token stored in localStorage as: ${TOKEN_KEY}
+✅ You can now test protected endpoints!`, 'success');
+                } else {
+                    showResult('loginResult', `❌ Login Failed
+
+Status: ${response.status}
+Response: ${JSON.stringify(data, null, 2)}
+
+${data.message || 'Invalid credentials'}`, 'error');
+                }
+            } catch (error) {
+                showResult('loginResult', `❌ Login Error
+
+${error.message}
+
+Make sure the backend is running and accessible.`, 'error');
+            }
+        }
+        
+        async function testProtectedEndpoint() {
+            const token = getToken();
+            
+            if (!token) {
+                showResult('protectedResult', '❌ No token found! Please login first.', 'error');
+                return;
+            }
+            
+            showResult('protectedResult', '⏳ Testing protected endpoint...', 'info');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/api/v1/students/profile/builder/steps`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                        'X-Client-ID': 'uniflow',
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    data = await response.text();
+                }
+                
+                if (response.ok) {
+                    showResult('protectedResult', `✅ Protected Endpoint Success!
+
+Status: ${response.status}
+Response:
+${JSON.stringify(data, null, 2)}
+
+✅ This proves the Authorization header is working!`, 'success');
+                } else {
+                    const authError = response.headers.get('X-Auth-Error');
+                    showResult('protectedResult', `❌ Protected Endpoint Failed
+
+Status: ${response.status}
+X-Auth-Error: ${authError || 'None'}
+Response: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}
+
+${response.status === 401 ? '⚠️ Token might be invalid or expired' : ''}`, 'error');
+                }
+            } catch (error) {
+                showResult('protectedResult', `❌ Request Error
+
+${error.message}`, 'error');
+            }
+        }
+        
+        async function testDocumentStatus() {
+            const token = getToken();
+            
+            if (!token) {
+                showResult('protectedResult', '❌ No token found! Please login first.', 'error');
+                return;
+            }
+            
+            showResult('protectedResult', '⏳ Testing document status endpoint...', 'info');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/student/document-status-overview/?ngrok-skip-browser-warning=true`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                        'ngrok-skip-browser-warning': 'true'
+                    }
+                });
+                
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    data = await response.text();
+                }
+                
+                if (response.ok) {
+                    showResult('protectedResult', `✅ Document Status Success!
+
+Status: ${response.status}
+Response:
+${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    const authError = response.headers.get('X-Auth-Error');
+                    showResult('protectedResult', `❌ Document Status Failed
+
+Status: ${response.status}
+X-Auth-Error: ${authError || 'None'}
+Response: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}
+
+${response.status === 404 ? '⚠️ Endpoint might not exist on backend' : ''}
+${response.status === 401 ? '⚠️ Token might be invalid or expired' : ''}`, 'error');
+                }
+            } catch (error) {
+                showResult('protectedResult', `❌ Request Error
+
+${error.message}`, 'error');
+            }
+        }
+        
+        // Check token on page load
+        window.onload = function() {
+            checkToken();
+        };
+    </script>
+</body>
+</html>

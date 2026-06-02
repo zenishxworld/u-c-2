@@ -1,0 +1,323 @@
+package com.uniflow.config;
+
+import java.time.Duration;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.*;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
+import reactor.kafka.receiver.KafkaReceiver;
+import reactor.kafka.receiver.ReceiverOptions;
+import reactor.kafka.sender.KafkaSender;
+import reactor.kafka.sender.SenderOptions;
+
+/**
+ * Kafka configuration for the consolidated UniFLow platform.
+ *
+ * <p>This configuration handles: - Reactive Kafka producers and consumers - Topic creation and
+ * management - Serialization/deserialization - Consumer group management - Error handling and retry
+ * logic
+ */
+@Slf4j
+@Configuration
+@EnableKafka
+@ConditionalOnProperty(
+    value = "uniflow.kafka.enabled",
+    havingValue = "true",
+    matchIfMissing = true
+)
+public class KafkaConfig {
+
+    @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
+    private String bootstrapServers;
+
+    @Value("${spring.kafka.consumer.group-id:uniflow-consolidated}")
+    private String consumerGroupId;
+
+    @Value("${spring.kafka.consumer.auto-offset-reset:earliest}")
+    private String autoOffsetReset;
+
+    @Value("${spring.kafka.producer.acks:all}")
+    private String producerAcks;
+
+    @Value("${spring.kafka.producer.retries:3}")
+    private int producerRetries;
+
+    @Value("${spring.kafka.producer.batch-size:16384}")
+    private int producerBatchSize;
+
+    @Value("${spring.kafka.producer.linger-ms:5}")
+    private int producerLingerMs;
+
+    @Value("${spring.kafka.producer.buffer-memory:33554432}")
+    private long producerBufferMemory;
+
+    // Topic names - centralized for consistency
+    public static final String AUTH_EVENTS_TOPIC = "auth-events";
+    public static final String STUDENT_EVENTS_TOPIC = "student-events";
+    public static final String ADMIN_EVENTS_TOPIC = "admin-events";
+    public static final String APPLICATION_EVENTS_TOPIC = "application-events";
+    public static final String UNIVERSITY_EVENTS_TOPIC = "university-events";
+    public static final String NOTIFICATION_EVENTS_TOPIC =
+        "notification-events";
+    public static final String VERIFICATION_LINKS_TOPIC = "verification-links";
+    public static final String WORKFLOW_EVENTS_TOPIC = "workflow-events";
+    public static final String AUDIT_EVENTS_TOPIC = "audit-events";
+
+    // Producer Configuration
+    @Bean
+    public Map<String, Object> producerConfigs() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(
+            ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+            StringSerializer.class
+        );
+        props.put(
+            ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+            JsonSerializer.class
+        );
+        props.put(ProducerConfig.ACKS_CONFIG, producerAcks);
+        props.put(ProducerConfig.RETRIES_CONFIG, producerRetries);
+        props.put(ProducerConfig.BATCH_SIZE_CONFIG, producerBatchSize);
+        props.put(ProducerConfig.LINGER_MS_CONFIG, producerLingerMs);
+        props.put(ProducerConfig.BUFFER_MEMORY_CONFIG, producerBufferMemory);
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
+        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
+
+        // JSON serializer configuration
+        props.put(JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
+
+        return props;
+    }
+
+    @Bean
+    public ProducerFactory<String, Object> producerFactory() {
+        return new DefaultKafkaProducerFactory<>(producerConfigs());
+    }
+
+    @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate() {
+        KafkaTemplate<String, Object> template = new KafkaTemplate<>(
+            producerFactory()
+        );
+        template.setDefaultTopic(AUTH_EVENTS_TOPIC);
+        return template;
+    }
+
+    // Reactive Producer Configuration
+    @Bean
+    public KafkaSender<String, Object> kafkaSender() {
+        SenderOptions<String, Object> senderOptions = SenderOptions.create(
+            producerConfigs()
+        );
+        return KafkaSender.create(senderOptions);
+    }
+
+    // Consumer Configuration
+    @Bean
+    public Map<String, Object> consumerConfigs() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
+        props.put(
+            ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+            StringDeserializer.class
+        );
+        props.put(
+            ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+            JsonDeserializer.class
+        );
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 30000);
+        props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, 3000);
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 100);
+        props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 1);
+        props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, 500);
+
+        // JSON deserializer configuration
+        props.put(
+            JsonDeserializer.TRUSTED_PACKAGES,
+            "com.uniflow.common.events.*"
+        );
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        props.put(JsonDeserializer.REMOVE_TYPE_INFO_HEADERS, false);
+
+        return props;
+    }
+
+    @Bean
+    public ConsumerFactory<String, Object> consumerFactory() {
+        return new DefaultKafkaConsumerFactory<>(consumerConfigs());
+    }
+
+    // Reactive Consumer Configuration
+    @Bean
+    public KafkaReceiver<String, Object> kafkaReceiver() {
+        ReceiverOptions<String, Object> receiverOptions = ReceiverOptions.<
+                String,
+                Object
+            >create(consumerConfigs())
+            .subscription(Collections.singleton(AUTH_EVENTS_TOPIC))
+            .addAssignListener(partitions ->
+                log.info("Assigned partitions: {}", partitions)
+            )
+            .addRevokeListener(partitions ->
+                log.info("Revoked partitions: {}", partitions)
+            )
+            .commitInterval(Duration.ofSeconds(1))
+            .commitBatchSize(10);
+
+        return KafkaReceiver.create(receiverOptions);
+    }
+
+    // Kafka Admin Configuration
+    @Bean
+    @ConditionalOnProperty(
+        value = "spring.kafka.admin.auto-create",
+        havingValue = "true",
+        matchIfMissing = false
+    )
+    public KafkaAdmin kafkaAdmin() {
+        Map<String, Object> configs = new HashMap<>();
+        configs.put(
+            AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
+            bootstrapServers
+        );
+        configs.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
+        return new KafkaAdmin(configs);
+    }
+
+    // Topic Creation
+    @Bean
+    public NewTopic authEventsTopic() {
+        return TopicBuilder.name(AUTH_EVENTS_TOPIC)
+            .partitions(3)
+            .replicas(1)
+            .config("cleanup.policy", "delete")
+            .config("retention.ms", "604800000") // 7 days
+            .config("compression.type", "snappy")
+            .build();
+    }
+
+    @Bean
+    public NewTopic studentEventsTopic() {
+        return TopicBuilder.name(STUDENT_EVENTS_TOPIC)
+            .partitions(3)
+            .replicas(1)
+            .config("cleanup.policy", "delete")
+            .config("retention.ms", "604800000") // 7 days
+            .config("compression.type", "snappy")
+            .build();
+    }
+
+    @Bean
+    public NewTopic adminEventsTopic() {
+        return TopicBuilder.name(ADMIN_EVENTS_TOPIC)
+            .partitions(3)
+            .replicas(1)
+            .config("cleanup.policy", "delete")
+            .config("retention.ms", "604800000") // 7 days
+            .config("compression.type", "snappy")
+            .build();
+    }
+
+    @Bean
+    public NewTopic applicationEventsTopic() {
+        return TopicBuilder.name(APPLICATION_EVENTS_TOPIC)
+            .partitions(5)
+            .replicas(1)
+            .config("cleanup.policy", "delete")
+            .config("retention.ms", "2592000000") // 30 days
+            .config("compression.type", "snappy")
+            .build();
+    }
+
+    @Bean
+    public NewTopic universityEventsTopic() {
+        return TopicBuilder.name(UNIVERSITY_EVENTS_TOPIC)
+            .partitions(3)
+            .replicas(1)
+            .config("cleanup.policy", "delete")
+            .config("retention.ms", "1209600000") // 14 days
+            .config("compression.type", "snappy")
+            .build();
+    }
+
+    @Bean
+    public NewTopic notificationEventsTopic() {
+        return TopicBuilder.name(NOTIFICATION_EVENTS_TOPIC)
+            .partitions(5)
+            .replicas(1)
+            .config("cleanup.policy", "delete")
+            .config("retention.ms", "259200000") // 3 days
+            .config("compression.type", "snappy")
+            .build();
+    }
+
+    @Bean
+    public NewTopic workflowEventsTopic() {
+        return TopicBuilder.name(WORKFLOW_EVENTS_TOPIC)
+            .partitions(3)
+            .replicas(1)
+            .config("cleanup.policy", "delete")
+            .config("retention.ms", "1209600000") // 14 days
+            .config("compression.type", "snappy")
+            .build();
+    }
+
+    @Bean
+    public NewTopic verificationLinksTopic() {
+        return TopicBuilder.name(VERIFICATION_LINKS_TOPIC)
+            .partitions(3)
+            .replicas(1)
+            .config("cleanup.policy", "delete")
+            .config("retention.ms", "259200000") // 3 days
+            .config("compression.type", "snappy")
+            .build();
+    }
+
+    @Bean
+    public NewTopic auditEventsTopic() {
+        return TopicBuilder.name(AUDIT_EVENTS_TOPIC)
+            .partitions(3)
+            .replicas(1)
+            .config("cleanup.policy", "delete")
+            .config("retention.ms", "7776000000") // 90 days
+            .config("compression.type", "snappy")
+            .build();
+    }
+
+    // Topic list for easy management
+    @Bean("allTopics")
+    public List<String> allTopics() {
+        return List.of(
+            AUTH_EVENTS_TOPIC,
+            STUDENT_EVENTS_TOPIC,
+            ADMIN_EVENTS_TOPIC,
+            APPLICATION_EVENTS_TOPIC,
+            UNIVERSITY_EVENTS_TOPIC,
+            NOTIFICATION_EVENTS_TOPIC,
+            VERIFICATION_LINKS_TOPIC,
+            WORKFLOW_EVENTS_TOPIC,
+            AUDIT_EVENTS_TOPIC
+        );
+    }
+}

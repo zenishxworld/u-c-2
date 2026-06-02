@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Uni360 Design System - Premium student portal with Apple-quality polish */
+
+@layer base {
+  :root {
+    /* Primary Brand Colors */
+    --background: 219 25% 98%;
+    --foreground: 210 11% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 11% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 15%;
+
+    /* Tiger's Eye Primary */
+    --primary: 25 73% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-muted: 25 73% 58% / 0.1;
+
+    /* Gunmetal Base */
+    --secondary: 210 11% 20%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Columbia Blue Accent */
+    --accent: 201 79% 85%;
+    --accent-foreground: 210 11% 15%;
+    --accent-muted: 201 79% 85% / 0.1;
+
+    /* Neutral Grays */
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 14% 55%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 25 73% 58%;
+
+    /* Design System Tokens */
+    --radius: 1rem;
+    --radius-lg: 1.25rem;
+    --radius-xl: 1.5rem;
+    --radius-pill: 9999px;
+
+    /* Shadows */
+    --shadow-soft: 0 8px 24px -4px hsl(210 11% 15% / 0.08);
+    --shadow-medium: 0 12px 32px -8px hsl(210 11% 15% / 0.12);
+    --shadow-float: 0 16px 40px -12px hsl(210 11% 15% / 0.16);
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(25 73% 58%), hsl(201 79% 85%));
+    --gradient-subtle: linear-gradient(180deg, hsl(219 25% 98%), hsl(220 14% 96%));
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.1), hsl(0 0% 100% / 0.05));
+
+    /* Animation Tokens */
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --ease-anticipate: cubic-bezier(0.32, 0, 0.67, 0);
+    --duration-micro: 180ms;
+    --duration-standard: 280ms;
+    --duration-page: 380ms;
+    --duration-entrance: 500ms;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark mode - Gunmetal base */
+    --background: 210 11% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 210 11% 10%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 210 11% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Tiger's Eye remains vibrant in dark */
+    --primary: 25 73% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-muted: 25 73% 58% / 0.15;
+
+    /* Gunmetal lighter for secondary */
+    --secondary: 210 11% 15%;
+    --secondary-foreground: 0 0% 98%;
+
+    /* Columbia Blue dimmed for dark */
+    --accent: 201 79% 75%;
+    --accent-foreground: 210 11% 8%;
+    --accent-muted: 201 79% 75% / 0.15;
+
+    --muted: 210 11% 15%;
+    --muted-foreground: 215 14% 65%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 11% 18%;
+    --input: 210 11% 18%;
+    --ring: 25 73% 58%;
+
+    /* Dark mode shadows */
+    --shadow-soft: 0 8px 24px -4px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 12px 32px -8px hsl(0 0% 0% / 0.4);
+    --shadow-float: 0 16px 40px -12px hsl(0 0% 0% / 0.5);
+
+    /* Dark gradients */
+    --gradient-subtle: linear-gradient(180deg, hsl(210 11% 8%), hsl(210 11% 10%));
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.05), hsl(0 0% 100% / 0.02));
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

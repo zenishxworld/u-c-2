@@ -1,0 +1,1 @@
+SELECT id, name, data->>'country' as country, data->>'country_code' as country_code FROM universities WHERE (data->>'country_code' IS NULL OR data->>'country_code' = '') AND deleted = false ORDER BY name;

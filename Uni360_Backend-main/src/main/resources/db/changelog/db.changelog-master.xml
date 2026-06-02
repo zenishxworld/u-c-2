@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!--
+    This is a minimal Liquibase changelog that prevents startup errors
+    while using schema.sql for actual database initialization.
+
+    The actual database schema is managed via schema.sql and
+    ConnectionFactoryInitializer in DatabaseConfig.java.
+    -->
+
+    <changeSet id="1" author="uniflow-system" runOnChange="true">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="users"/>
+            </not>
+        </preConditions>
+        <comment>Initial schema validation - check if tables exist</comment>
+        <sql>
+            -- This changeset validates schema but doesn't create anything
+            -- Schema is managed via schema.sql in ConnectionFactoryInitializer
+            SELECT 1 as schema_check;
+        </sql>
+    </changeSet>
+
+    <changeSet id="2" author="uniflow-system" runAlways="true">
+        <preConditions onFail="CONTINUE">
+            <tableExists tableName="users"/>
+        </preConditions>
+        <comment>Mark schema as initialized if tables exist</comment>
+        <sql>
+            -- Tables already exist from schema.sql initialization
+            SELECT 'Schema already initialized' as status;
+        </sql>
+    </changeSet>
+
+    <changeSet id="3" author="uniflow-system">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="visa_checklists"/></not>
+        </preConditions>
+        <comment>Create visa_checklists table</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS visa_checklists (
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                country     VARCHAR(10)  NOT NULL,
+                title       VARCHAR(255),
+                items       JSONB,
+                admin_id    BIGINT,
+                created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_visa_checklist_country UNIQUE (country)
+            );
+        </sql>
+    </changeSet>
+
+    <changeSet id="4" author="uniflow-system">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="visa_trackers"/></not>
+        </preConditions>
+        <comment>Create visa_trackers table</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS visa_trackers (
+                id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                student_id       BIGINT       NOT NULL,
+                country          VARCHAR(10)  NOT NULL,
+                status           VARCHAR(30)  NOT NULL DEFAULT 'NOT_STARTED',
+                completed_items  JSONB,
+                notes            TEXT,
+                created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_visa_trackers_student_id ON visa_trackers(student_id);
+        </sql>
+    </changeSet>
+
+    <changeSet id="5" author="uniflow-system">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="embassy_appointments"/></not>
+        </preConditions>
+        <comment>Create embassy_appointments table</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS embassy_appointments (
+                id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                student_id         BIGINT       NOT NULL,
+                country            VARCHAR(10)  NOT NULL,
+                appointment_date   DATE,
+                appointment_time   TIME,
+                location           VARCHAR(255),
+                status             VARCHAR(30)  NOT NULL DEFAULT 'PENDING',
+                notes              TEXT,
+                created_by_admin   BIGINT,
+                created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_embassy_appts_student_id ON embassy_appointments(student_id);
+            CREATE INDEX IF NOT EXISTS idx_embassy_appts_status ON embassy_appointments(status);
+        </sql>
+    </changeSet>
+
+    <changeSet id="6" author="uniflow-system">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="meeting_urls"/></not>
+        </preConditions>
+        <comment>Create meeting_urls table</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS meeting_urls (
+                id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                section            VARCHAR(20)  NOT NULL,
+                url                TEXT         NOT NULL,
+                label              VARCHAR(255),
+                is_active          BOOLEAN      NOT NULL DEFAULT true,
+                created_by_admin   BIGINT,
+                created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_meeting_urls_section ON meeting_urls(section);
+        </sql>
+    </changeSet>
+
+    <changeSet id="7" author="uniflow-system">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="admin_queries"/></not>
+        </preConditions>
+        <comment>Create admin_queries table</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS admin_queries (
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                admin_id    BIGINT       NOT NULL,
+                subject     VARCHAR(255) NOT NULL,
+                message     TEXT         NOT NULL,
+                reply       TEXT,
+                replied_by  BIGINT,
+                replied_at  TIMESTAMP,
+                status      VARCHAR(20)  NOT NULL DEFAULT 'OPEN',
+                created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_admin_queries_admin_id ON admin_queries(admin_id);
+            CREATE INDEX IF NOT EXISTS idx_admin_queries_status ON admin_queries(status);
+        </sql>
+    </changeSet>
+    <changeSet id="8" author="uniflow-system">
+        <comment>Change JSONB columns to TEXT for R2DBC compatibility</comment>
+        <sql>
+            ALTER TABLE visa_checklists ALTER COLUMN items TYPE TEXT USING items::text;
+            ALTER TABLE visa_trackers ALTER COLUMN completed_items TYPE TEXT USING completed_items::text;
+        </sql>
+        <rollback>
+            ALTER TABLE visa_checklists ALTER COLUMN items TYPE JSONB USING items::jsonb;
+            ALTER TABLE visa_trackers ALTER COLUMN completed_items TYPE JSONB USING completed_items::jsonb;
+        </rollback>
+    </changeSet>
+    <changeSet id="9" author="uniflow-system">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="payments"/></not>
+        </preConditions>
+        <comment>Create payments table for Razorpay tracking</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS payments (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                student_id BIGINT NOT NULL,
+                amount DECIMAL(10,2) NOT NULL,
+                currency VARCHAR(3) DEFAULT 'INR',
+                razorpay_order_id VARCHAR(255) UNIQUE NOT NULL,
+                razorpay_payment_id VARCHAR(255),
+                status VARCHAR(50) DEFAULT 'PENDING',
+                payment_purpose VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_payments_student_id ON payments(student_id);
+            CREATE INDEX IF NOT EXISTS idx_payments_razorpay_order_id ON payments(razorpay_order_id);
+        </sql>
+    </changeSet>
+
+    <changeSet id="10" author="uniflow-system">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="university_commissions"/></not>
+        </preConditions>
+        <comment>Create university_commissions table for SuperAdmin commission tracking</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS university_commissions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                university_id UUID NOT NULL UNIQUE,
+                commission_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+                description VARCHAR(255),
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by VARCHAR(255),
+                updated_by VARCHAR(255)
+            );
+        </sql>
+    </changeSet>
+
+    <changeSet id="11" author="uniflow-system">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="contact_submissions"/></not>
+        </preConditions>
+        <comment>Create contact_submissions table</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS contact_submissions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                first_name VARCHAR(100) NOT NULL,
+                last_name  VARCHAR(100) NOT NULL,
+                email      VARCHAR(255) NOT NULL,
+                phone      VARCHAR(30),
+                country    VARCHAR(100),
+                subject    VARCHAR(255) NOT NULL,
+                message    TEXT NOT NULL,
+                status     VARCHAR(20) DEFAULT 'NEW',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_contact_submissions_email ON contact_submissions(email);
+            CREATE INDEX IF NOT EXISTS idx_contact_submissions_created_at ON contact_submissions(created_at);
+        </sql>
+    </changeSet>
+
+    <changeSet id="12" author="uniflow-system">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="quiz_sessions"/></not>
+        </preConditions>
+        <comment>Create quiz_sessions and quiz_answers tables</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS quiz_sessions (
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                student_id  BIGINT NOT NULL,
+                score       INTEGER DEFAULT 0,
+                matched_universities JSONB DEFAULT '[]',
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS quiz_answers (
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                session_id  UUID NOT NULL REFERENCES quiz_sessions(id) ON DELETE CASCADE,
+                question_id VARCHAR(100) NOT NULL,
+                answer      VARCHAR(255) NOT NULL,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_quiz_sessions_student_id ON quiz_sessions(student_id);
+            CREATE INDEX IF NOT EXISTS idx_quiz_answers_session_id  ON quiz_answers(session_id);
+        </sql>
+    </changeSet>
+
+    <changeSet id="13" author="uniflow-system" runOnChange="true">
+        <comment>Update Germany and UK workflow definitions in DB to match new stages</comment>
+        <sqlFile path="db/migration/V6__update_workflow_fees_university_stages.sql" relativeToChangelogFile="false"/>
+    </changeSet>
+
+</databaseChangeLog>

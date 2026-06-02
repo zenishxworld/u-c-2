@@ -1,0 +1,380 @@
+/* ── Wrapper ── */
+.react-datepicker-wrapper,
+.react-datepicker__input-container {
+    width: 100%;
+}
+
+/* ── Popup ── */
+.react-datepicker {
+    font-family: inherit;
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.14), 0 4px 16px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    font-size: 13.5px;
+    background: #ffffff;
+    min-width: 300px;
+}
+
+/* ── Header ── */
+.react-datepicker__header {
+    background: #ffffff;
+    border-bottom: 1px solid #f3f4f6;
+    padding: 20px 20px 12px;
+    border-radius: 0;
+}
+
+/* ── Custom Header ── */
+.dp-custom-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 0 6px;
+}
+
+/* Nav prev / next buttons */
+.dp-nav-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #E08D3C;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.dp-nav-btn:hover:not(:disabled) {
+    background: #fff4e8;
+    color: #c77a2e;
+}
+
+.dp-nav-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+/* Month dropdown wrapper */
+.dp-month-dropdown-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    max-width: 130px;
+}
+
+/* Month trigger button */
+.dp-month-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    border: 1.5px solid #f0e6d8;
+    border-radius: 50px;
+    padding: 6px 12px;
+    background-color: #fff8f0;
+    color: #92400e;
+    font-weight: 700;
+    font-size: 12.5px;
+    cursor: pointer;
+    outline: none;
+    box-shadow: 0 1px 3px rgba(224, 141, 60, 0.1);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+}
+
+.dp-month-trigger:hover {
+    border-color: #E08D3C;
+    box-shadow: 0 2px 6px rgba(224, 141, 60, 0.18);
+}
+
+/* Month dropdown list */
+.dp-month-dropdown-list {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 130px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1.5px solid #f0e6d8;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(224, 141, 60, 0.08);
+    z-index: 99999;
+    padding: 4px;
+}
+
+/* Thin scrollbar */
+.dp-month-dropdown-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.dp-month-dropdown-list::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+}
+
+.dp-month-dropdown-list::-webkit-scrollbar-thumb {
+    background: #f0d5b5;
+    border-radius: 4px;
+}
+
+.dp-month-dropdown-list::-webkit-scrollbar-thumb:hover {
+    background: #E08D3C;
+}
+
+/* Firefox scrollbar */
+.dp-month-dropdown-list {
+    scrollbar-width: thin;
+    scrollbar-color: #f0d5b5 transparent;
+}
+
+/* Each month option */
+.dp-month-option {
+    padding: 5px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #4b5563;
+    text-align: center;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+
+.dp-month-option:hover {
+    background: #fff4e8;
+    color: #E08D3C;
+}
+
+/* Active / selected month */
+.dp-month-option--active {
+    background: linear-gradient(135deg, #E08D3C, #f0a855);
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.dp-month-option--active:hover {
+    background: linear-gradient(135deg, #c97a30, #E08D3C);
+    color: #ffffff;
+}
+
+/* Year dropdown wrapper */
+.dp-year-dropdown-wrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* Year trigger button */
+.dp-year-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1.5px solid #f0e6d8;
+    border-radius: 50px;
+    padding: 6px 12px;
+    background-color: #fff8f0;
+    color: #92400e;
+    font-weight: 700;
+    font-size: 12.5px;
+    cursor: pointer;
+    outline: none;
+    box-shadow: 0 1px 3px rgba(224, 141, 60, 0.1);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+}
+
+.dp-year-trigger:hover {
+    border-color: #E08D3C;
+    box-shadow: 0 2px 6px rgba(224, 141, 60, 0.18);
+}
+
+/* Dropdown list */
+.dp-year-dropdown-list {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 88px;
+    max-height: 180px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1.5px solid #f0e6d8;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(224, 141, 60, 0.08);
+    z-index: 99999;
+    padding: 4px;
+}
+
+/* Thin scrollbar */
+.dp-year-dropdown-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.dp-year-dropdown-list::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+}
+
+.dp-year-dropdown-list::-webkit-scrollbar-thumb {
+    background: #f0d5b5;
+    border-radius: 4px;
+}
+
+.dp-year-dropdown-list::-webkit-scrollbar-thumb:hover {
+    background: #E08D3C;
+}
+
+/* Firefox scrollbar */
+.dp-year-dropdown-list {
+    scrollbar-width: thin;
+    scrollbar-color: #f0d5b5 transparent;
+}
+
+/* Each option */
+.dp-year-option {
+    padding: 5px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #4b5563;
+    text-align: center;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+
+.dp-year-option:hover {
+    background: #fff4e8;
+    color: #E08D3C;
+}
+
+/* Active / selected year */
+.dp-year-option--active {
+    background: linear-gradient(135deg, #E08D3C, #f0a855);
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.dp-year-option--active:hover {
+    background: linear-gradient(135deg, #c97a30, #E08D3C);
+    color: #ffffff;
+}
+
+/* Hide built-in month label (header is fully custom) */
+.react-datepicker__current-month {
+    display: none;
+}
+
+/* ── Day names row ── */
+.react-datepicker__day-names {
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-around;
+    padding: 0 8px;
+}
+
+.react-datepicker__day-name {
+    color: #9ca3af;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    width: 2.2rem;
+    line-height: 2rem;
+    text-align: center;
+}
+
+/* ── Built-in nav arrows — hidden; custom header provides its own ── */
+.react-datepicker__navigation {
+    display: none;
+}
+
+/* ── Month body ── */
+.react-datepicker__month {
+    margin: 0;
+    padding: 10px 16px 16px;
+}
+
+.react-datepicker__week {
+    display: flex;
+    justify-content: space-around;
+}
+
+/* ── Day cells ── */
+.react-datepicker__day {
+    width: 2.2rem;
+    height: 2.2rem;
+    line-height: 2.2rem;
+    border-radius: 50%;
+    color: #1f2937;
+    font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+    text-align: center;
+    margin: 2px 0;
+}
+
+.react-datepicker__day:hover {
+    background-color: #fff4e8;
+    color: #E08D3C;
+    font-weight: 600;
+    border-radius: 50%;
+}
+
+/* ── Selected day ── */
+.react-datepicker__day--selected {
+    background: linear-gradient(135deg, #E08D3C, #f0a855) !important;
+    color: white !important;
+    font-weight: 700 !important;
+    border-radius: 50% !important;
+    box-shadow: 0 4px 12px rgba(224, 141, 60, 0.4);
+}
+
+/* ── Keyboard selected (unfocused) ── */
+.react-datepicker__day--keyboard-selected {
+    background: #fff4e8;
+    color: #E08D3C;
+    border-radius: 50%;
+}
+
+/* ── Today ── */
+.react-datepicker__day--today:not(.react-datepicker__day--selected) {
+    color: #E08D3C;
+    font-weight: 700;
+    position: relative;
+}
+
+.react-datepicker__day--today:not(.react-datepicker__day--selected)::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    background: #E08D3C;
+    border-radius: 50%;
+}
+
+/* ── Outside month ── */
+.react-datepicker__day--outside-month {
+    color: #d1d5db !important;
+}
+
+/* ── No triangle ── */
+.react-datepicker__triangle {
+    display: none !important;
+}
+
+/* ── Popper z-index ── */
+.react-datepicker-popper {
+    z-index: 9999;
+    padding-top: 8px !important;
+}

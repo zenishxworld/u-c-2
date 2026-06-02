@@ -1,0 +1,209 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: uniflow-postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=uniflow
+      - POSTGRES_PASSWORD=uniflow_admin
+      - POSTGRES_DB=uniflow_db_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/docker/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uniflow -d uniflow_db_dev"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - uniflow-network
+
+  # Redis Cache - Simplified configuration
+  redis:
+    image: redis:7-alpine
+    container_name: uniflow-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass uniflow
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "uniflow", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - uniflow-network
+
+  # Kafka (KRaft mode - without Zookeeper)
+  kafka:
+    container_name: uniflow-kafka
+    build:
+      context: infra/docker/kafka
+      dockerfile: Dockerfile
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_CLUSTER_ID: OTMwNzFhYTY1ODNiNGE5OQ
+    volumes:
+      - kafka_data:/tmp/kafka-logs
+      - ./infra/docker/kafka/server.properties:/kafka/config/kraft/server.properties
+      - ./infra/docker/kafka/jaas.conf:/kafka/config/jaas.conf
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-topics.sh --bootstrap-server localhost:9092 --list",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - uniflow-network
+
+  # UniFLow Application Service
+  uniflow-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: uniflow-app
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+      - SPRING_R2DBC_URL=${SPRING_R2DBC_URL:-r2dbc:postgresql://postgres:5432/uniflow_db_dev}
+      - SPRING_R2DBC_USERNAME=${SPRING_R2DBC_USERNAME:-uniflow}
+      - SPRING_R2DBC_PASSWORD=${SPRING_R2DBC_PASSWORD:-uniflow_admin}
+      - SPRING_LIQUIBASE_URL=${SPRING_LIQUIBASE_URL:-jdbc:postgresql://postgres:5432/uniflow_db_dev}
+      - SPRING_LIQUIBASE_USER=${SPRING_LIQUIBASE_USER:-uniflow}
+      - SPRING_LIQUIBASE_PASSWORD=${SPRING_LIQUIBASE_PASSWORD:-uniflow_admin}
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_PASSWORD=uniflow
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - UNIFLOW_CACHE_ENABLED=true
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks:
+      - uniflow-network
+
+  # Database Admin Interface
+  adminer:
+    image: adminer:latest
+    container_name: uniflow-adminer
+    restart: always
+    ports:
+      - "8081:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    depends_on:
+      - postgres
+    networks:
+      - uniflow-network
+    profiles:
+      - admin
+
+  # Redis Commander (Development Tool)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: uniflow-redis-commander
+    restart: always
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0:uniflow
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    networks:
+      - uniflow-network
+    profiles:
+      - admin
+
+  # Kafka UI (Development Tool)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: uniflow-kafka-ui
+    restart: always
+    ports:
+      - "8083:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - uniflow-network
+    profiles:
+      - admin
+
+  # n8n Workflow Automation
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: uniflow-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=uniflow123
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - GENERIC_TIMEZONE=Asia/Kolkata
+      # Anthropic API key — override via environment variable
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - N8N_RUNNERS_ENABLED=true
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - uniflow-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  kafka_data:
+    driver: local
+  n8n_data:
+    driver: local
+
+networks:
+  uniflow-network:
+    driver: bridge
+# Usage Instructions:
+# 1. Start infrastructure only: docker-compose up -d postgres redis kafka
+# 2. Start with admin tools: docker-compose --profile admin up -d
+# 3. Start n8n only: docker-compose up -d n8n
+# 4. Stop all: docker-compose down
+# 5. Clean volumes: docker-compose down -v
+#
+# Services Available:
+# - PostgreSQL: localhost:5432 (uniflow/uniflow_admin)
+# - Redis: localhost:6379 (password: uniflow)
+# - Kafka: localhost:9092
+# - n8n: http://localhost:5678 (admin/uniflow)
+# - Adminer: http://localhost:8081 (with --profile admin)
+# - Redis Commander: http://localhost:8082 (with --profile admin)
+# - Kafka UI: http://localhost:8083 (with --profile admin)

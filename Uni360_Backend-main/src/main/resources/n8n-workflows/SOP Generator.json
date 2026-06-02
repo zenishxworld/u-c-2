@@ -1,0 +1,588 @@
+{
+  "name": "SOP Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        784,
+        1648
+      ],
+      "id": "8c50904c-e6cf-4666-b878-0a53841400c2",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "gsD0oAsC9YOLpJR4",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1392,
+        2240
+      ],
+      "id": "2ac73361-2696-4931-b789-a30d9c5700e1",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "sop-generator-2",
+          "mode": "list",
+          "cachedResultName": "sop-generator-2"
+        },
+        "embeddingBatchSize": 64,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1280,
+        1184
+      ],
+      "id": "24499ee4-52f0-4930-b316-84b2ec2c8505",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+        "pineconeApi": {
+          "id": "RLDkxW3Z6QJghq5G",
+          "name": "Cover Letter Pinecone API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "loader": "pdfLoader",
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1376,
+        1408
+      ],
+      "id": "19579b29-50f3-4f89-b87d-da9627a67a63",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "chunkSize": 600,
+        "chunkOverlap": 100,
+        "options": {
+          "splitCode": "={{ [\"\\n\\n\", \"\\n\", \". \", \" \"] }}\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1456,
+        1616
+      ],
+      "id": "da46a3f8-9a43-42cd-967b-573899acb108",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        352,
+        1184
+      ],
+      "id": "59bc1796-5b58-4905-9a5f-4d043950cc8f",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=USER INFORMATION (FACTS — USE EXACTLY, DO NOT INVENT):\n\nFull Name: **{{ $json.fullName }}**\nGender: **{{ $json.gender }}**\nNationality: **{{ $json.nationality }}**\nHome Country: **{{ $json.homeCountry }}**\nCurrent Status: **{{ $json.current_status }}**\nTarget Degree: **{{ $json.degreeLevel }}**\nField of Study: **{{ $json.field_of_study }}**\nTarget University: **{{ $json.university }}**\nTarget University Country: **{{ $json.intendedCountry }}**\nTarget Program: **{{ $json.program }}**\n\nAcademic Background:\nPast Program: **{{ $json.program }}**\nInstitution: **{{ $json.institutionName }}**\nYear of Completion: **{{ $json.graduationYear }}**\nCGPA or Percentage: **{{ $json.cgpa_or_percentage }}**\n\nMotivation:\n{{ $json.motivation }}\n\nExperience & Projects:\nSummary & Details: **{{ $json.experience_details }}**\nMajor Projects: **{{ $json.major_projects }}**\nInternship Details: {{ $json.internship_details }}\n\nCertifications:\n{{ $json.certifications }}\n\nProgram Fit:\nWhy This Program: {{ $json.whyProgram }}\nWhy This Country: {{ $json.why_country }}\nSubjects of Interest: **{{ $json.areasOfInterest }}**\n\nUniversity Fit:\nWhy This University: {{ $json.whyUniversity }}\n\nCareer Goals:\nShort-Term Goal: {{ $json.shortTermGoal }}\nLong-Term Goal: {{ $json.longTermGoal }}\n\nHome Country Return Intent:\n{{ $json.returnReason }}\n\nPersonal Strengths & Challenges:\nKey Strengths: **{{ $json.keyStrengths }}**\nChallenges Overcome: {{ $json.challenges_overcome }}\n\nTest Scores / Language Levels:\nIELTS Score: **{{ $json.ielts_score }}**\nGerman Language Level: **{{ $json.german_language_level }}**\n\n--------------------------------------------------\n\nTASK (FOLLOW STRICTLY):\n\n1. You MUST call the vector_store tool exactly once using this query :\n   \"Successful Statement of Purpose sample for **{{ $json.degreeLevel }}** admission showing strong academic motivation and career goals\"\n\n2. REFERENCE USAGE STRATEGY:\n   - The retrieved document is for **STRUCTURE ONLY**.\n   - IGNORE the specific subject matter of the reference.\n   - MIMIC the sentence variation but **NOT** the complex vocabulary.\n\n3. Write a COMPLETE Statement of Purpose between 700–900 words.\n\n4. VOCABULARY CONTROL (CRITICAL):\n   - Write in **\"Clean, Professional English\"** (CEFR Level B2/C1), NOT \"Complex Academic English.\"\n   - **BANNED WORDS:** Do not use these words: *delve, plethora, myriad, underscore, pivotal, realm, tapestry, unwavering, keen interest, esteemed.*\n   - **RULE OF THUMB:** If a student wouldn't say the word in a job interview, do not write it here.\n   - Use active verbs (e.g., \"I built,\" \"I designed\") instead of passive academic phrases.\n\n5. STRUCTURE:\n   - Introduction with personal motivation\n   - Academic background\n   - Practical experience\n   - Why this program\n   - Why this university\n   - Short-term career goals\n   - Long-term career goals with return to home country\n   - Strong concluding paragraph\n\nSTRICT RULES:\n- Use ONLY the user information above as factual content\n- Do NOT copy sentences from reference SOPs\n- Do NOT use placeholders, dummy names, or generic praise\n- Do NOT invent achievements, scores, or experiences\n- Maintain a visa-safe tone with clear home-country intent",
+        "options": {
+          "systemMessage": "=You are an expert academic Statement of Purpose (SOP) writer for international university admissions.\nROLE EXPECTATION:\nYou write SOPs that read as if they were written by a serious, thoughtful applicant and refined by an experienced admissions consultant — not like an academic essay or marketing content.\nAUTHORSHIP CONSTRAINTS (CRITICAL):\nWrite the SOP as if it were authored by a single human.\nDo not attempt to be exhaustive.\nAvoid academic filler and repeated justification.\nFavor concrete experiences over generalized statements.\nDo not explain the importance of every detail.\nTASK:\nWrite a COMPLETE Statement of Purpose between 700–900 words following the logical flow below, WITHOUT headings, numbering, or section labels:\n\n1. Introduction with personal motivation\n2. Academic background\n3. Practical experience\n4. Why this program\n5. Why this university\n6. Short-term career goals\n7. Long-term career goals with clear return to home country\n8. Conclusion reaffirming commitment\nSTYLE & TONE RULES (CRITICAL):\n- Write in clear, natural academic English\n- Prefer clarity over sophistication\n- Avoid metaphors, poetic expressions, or dramatic language\n- Avoid phrases that sound “overly polished” or literary\n- Sentences should feel professional, sincere, and grounded\n- Sound confident but not promotional\n\nHUMAN RHYTHM RULES (CRITICAL):\n- Vary sentence length aggressively.\n- Include occasional short, direct sentences.\n- Avoid making every sentence grammatically or rhythmically similar.\n- Allow mild, natural transitions commonly used by applicants (e.g., “During this period,” “Over time,” “At that stage”).\nFORMAT RULES (MANDATORY):\n- Write exactly 7–8 long, continuous paragraphs\n- No headings, subheadings, bullets, or numbering\n- Each paragraph must be approximately 100–140 words\n- Paragraphs must flow naturally like a personal academic narrative\n- Each paragraph must implicitly correspond to ONE section\n\nFACTUAL CONSTRAINTS:\n- Use ONLY user-provided information\n- Do NOT invent achievements, scores, institutions, or experiences\n- Do NOT add rankings, statistics, or claims not provided\n- Do NOT paraphrase or copy reference SOPs\n\nVISA SAFETY:\n- Maintain a visa-safe, non-immigration tone\n- Clearly and logically express intent to return to the home country\n- Avoid emotional exaggeration\n\nQUALITY CONTROL:\n- Avoid repetition of phrases or sentence patterns\n- If under 700 words, expand by explaining motivation and reasoning, NOT by adding new facts\n\nBefore finalizing, mentally review the SOP and remove any sentence that sounds like it was written for an academic journal rather than a university application.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        832,
+        96
+      ],
+      "id": "a2a90b9f-2319-4086-9409-6e7914c68659",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "description": "=Call this tool to find reference Statements of Purpose based on the user's degree and field."
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [
+        944,
+        288
+      ],
+      "id": "aa7d3dd6-012c-454f-ac3c-41fc35488e92",
+      "name": "Answer questions with a vector store"
+    },
+    {
+      "parameters": {
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "sop-generator-2",
+          "mode": "list",
+          "cachedResultName": "sop-generator-2"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        768,
+        464
+      ],
+      "id": "b199d9e5-ca7d-41b6-a4b3-66db6c17c0c7",
+      "name": "Pinecone Vector Store1",
+      "credentials": {
+        "pineconeApi": {
+          "id": "HCAi5xwmwvC50R6s",
+          "name": "SOP Pinecoin"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Here is the SOP draft. Apply the humanization pass as instructed:\n\n{{ $json.output || $json.text || $json.result || $json }}\n\n",
+        "options": {
+          "systemMessage": "=You are a frantic, expert human editor.\n\n**INPUT:**\nYou will receive a Statement of Purpose (SOP) drafted by an AI.\n\n**YOUR JOB:**\nRewrite the text to make it sound like it was written by a HUMAN applicant.\nThe current draft is too smooth, too predictable, and uses \"perfect\" transitions. You must break these patterns while keeping the professional meaning.\n\n**STRICT HUMANIZATION RULES:**\n\n1.  **KILL THE ROBOT RHYTHM (The \"Burstiness\" Rule):**\n    * AI writes sentences of equal length (Medium-Medium-Medium).\n    * **You must vary this aggressively:** (Short. Very Long Complex Sentence. Medium. Short.)\n    * *Example:* Instead of \"I studied algorithms and I found them fascinating,\" write: \"Algorithms fascinated me. I spent weeks just trying to optimize one sorting function, and when it finally worked, I was hooked.\"\n\n2.  **DESTROY \"GLUE\" WORDS:**\n    * **Delete these immediately:** *Moreover, Furthermore, Consequently, Additionally, Thus, In conclusion.*\n    * Replace them with natural starts: *Also, So, Then, But* — or just delete the transition entirely and start the new sentence directly.\n\n3.  **REMOVE \"RESUME SPEAK\":**\n    * Change \"I utilized Python to optimize the system\" → \"I used Python to speed up the system.\"\n    * Change \"This demonstrated my leadership skills\" → \"This taught me how to lead.\"\n\n4.  **RETAIN PROFESSIONALISM:**\n    * Do NOT turn it into slang. No \"stuff,\" \"cool,\" or \"super.\"\n    * Keep the technical details (Java, SQL, Distributed Systems) exactly as they are.\n\n**OUTPUT:**\nReturn ONLY the rewritten text. Do not add bolding, headers, or \"Here is your version.\"\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1168,
+        0
+      ],
+      "id": "3cd9300d-ed27-425e-ba37-24e1f4eea92f",
+      "name": "Humanization Pass – SOP Trim"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sop-generator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b8fa3d78-ca55-453f-b52e-00ea5b125c83",
+      "name": "Webhook",
+      "webhookId": "ea340e0a-176e-4abe-aacd-b0386e95ceea"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1632,
+        96
+      ],
+      "id": "4941d856-032a-4193-845c-cfd8be058eec",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $json.body || $json;\n\nreturn [{\n  // --- Identity ---\n  fullName: i.fullName,\n  gender: i.gender,\n  nationality: i.nationality,\n  homeCountry: i.homeCountry,\n  current_status: i.current_status || i.currentStatus,\n  intendedCountry: i.intendedCountry,\n\n  // --- Target Education ---\n  university: i.university, \n  degreeLevel: i.degreeLevel,\n  program: i.program, \n  field_of_study: i.fieldOfStudy || i.field_of_study,\n\n  // --- Past Education ---\n  institutionName: i.institutionName,\n  graduationYear: i.graduationYear,\n  cgpa_or_percentage: i.cgpa_or_percentage || i.cgpaOrPercentage,\n\n  // --- Motivation & Experience ---\n  motivation: i.motivation,\n  experienceType: i.experienceType,\n  workExperience: i.workExperience,\n  experience_details: i.experience_details || i.experienceDetails,\n  major_projects: i.major_projects || i.majorProjects,\n\n  // --- Fit ---\n  areasOfInterest: i.areasOfInterest,\n  whyProgram: i.whyProgram,\n  whyUniversity: i.whyUniversity,\n  keyStrengths: i.keyStrengths,\n\n  // --- Future ---\n  shortTermGoal: i.shortTermGoal,\n  longTermGoal: i.longTermGoal,\n  returnReason: i.returnReason,\n\n  // --- Important Optional Fields ---\n  internship_details: i.internship_details || i.internshipDetails,\n  certifications: i.certifications,\n  why_country: i.why_country || i.whyCountry,\n  challenges_overcome: i.challenges_overcome || i.challengesOvercome,\n  ielts_score: i.ielts_score || i.ieltsScore,\n  german_language_level: i.german_language_level || i.germanLanguageLevel,\n\n  // --- AI Controls ---\n  tone: i.tone || \"PROFESSIONAL\",\n  word_limit: i.word_limit || i.wordLimit || 800,\n  additional_requirements: i.additional_requirements || i.additionalRequirements || \"\"\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "5883a17d-e0e7-47f3-bcb9-5705a5928407",
+      "name": "collect data"
+    },
+    {
+      "parameters": {
+        "modelName": "BAAI/bge-base-en-v1.5",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        1520
+      ],
+      "id": "1985a769-3638-464f-8cce-60567f973159",
+      "name": "Embeddings HuggingFace Inference",
+      "credentials": {
+        "huggingFaceApi": {
+          "id": "voE2PuQ0EnSq59tl",
+          "name": "SOP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "BAAI/bge-base-en-v1.5",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        880,
+        688
+      ],
+      "id": "1b2c7b73-fc15-495b-89a4-99db7005c8ee",
+      "name": "Embeddings HuggingFace Inference1",
+      "credentials": {
+        "huggingFaceApi": {
+          "id": "voE2PuQ0EnSq59tl",
+          "name": "SOP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        208
+      ],
+      "id": "9c685e1e-aaf4-4307-b3f7-8149943fec28",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "wwPu8UJY4nqNlGR4",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1312,
+        512
+      ],
+      "id": "b6ab6296-83f2-4f16-b69d-44cfa3431e61",
+      "name": "Anthropic Chat Model1",
+      "credentials": {
+        "anthropicApi": {
+          "id": "wwPu8UJY4nqNlGR4",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1264,
+        320
+      ],
+      "id": "f0685a13-7865-4624-9dea-33791fdb5194",
+      "name": "Anthropic Chat Model2",
+      "credentials": {
+        "anthropicApi": {
+          "id": "wwPu8UJY4nqNlGR4",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "limit": 500,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "1GFYAojvg7p-S1SrM_62IGmYlcdi1Bgut",
+            "mode": "list",
+            "cachedResultName": "sop general",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1GFYAojvg7p-S1SrM_62IGmYlcdi1Bgut"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        576,
+        1184
+      ],
+      "id": "87ea04d0-89df-4f5c-b0c6-b8bbeb3c2de8",
+      "name": "Search files and folders",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "gsD0oAsC9YOLpJR4",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Search files and folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Humanization Pass – SOP Trim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer questions with a vector store": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store1": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Humanization Pass – SOP Trim": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "collect data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "collect data": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings HuggingFace Inference": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings HuggingFace Inference1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Humanization Pass – SOP Trim",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search files and folders": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7418ed3c-74ca-4682-a375-15a0fd52d790",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d57e2d7c93e52cdb902ab43ddb3c518f4167b13d72edbdc9d74758f6091c72a8"
+  },
+  "id": "yswuSnWl90USbkfO",
+  "tags": []
+}

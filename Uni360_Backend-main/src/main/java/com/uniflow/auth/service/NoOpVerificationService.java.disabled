@@ -1,0 +1,114 @@
+package com.uniflow.auth.service;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+/**
+ * No-op verification service used when Redis is disabled.
+ *
+ * <p>This service provides a simple in-memory fallback implementation that: - Generates tokens but
+ * doesn't persist them - Always accepts tokens as valid (for development/testing) - Logs
+ * verification attempts for debugging
+ */
+@Service
+@ConditionalOnProperty(name = "uniflow.cache.enabled", havingValue = "false", matchIfMissing = true)
+@Slf4j
+public class NoOpVerificationService implements VerificationServiceInterface {
+
+  @Value("${uniflow.verification.token-expiry-hours:24}")
+  private int tokenExpiryHours;
+
+  @Value("${uniflow.base-url:http://localhost:8080}")
+  private String baseUrl;
+
+  /**
+   * Generate a verification token (not persisted).
+   *
+   * @param userId The user ID
+   * @param email The user's email address
+   * @param userType The type of user (STUDENT, ADMIN)
+   * @return Mono containing the verification token and expiry information
+   */
+  public Mono<RedisVerificationService.VerificationTokenInfo> generateVerificationToken(
+      Long userId, String email, String userType) {
+    String token = UUID.randomUUID().toString();
+    LocalDateTime expiresAt = LocalDateTime.now().plusHours(tokenExpiryHours);
+
+    log.info("📝 NO-OP VERIFICATION: Generated token for user ID: {} ({})", userId, email);
+    log.info("🔗 Verification link would be: {}/api/v1/auth/verify-email?token={}", baseUrl, token);
+    log.info("⏰ Token would expire at: {}", expiresAt);
+
+    return Mono.just(
+        RedisVerificationService.VerificationTokenInfo.builder()
+            .token(token)
+            .expiresAt(expiresAt)
+            .verificationLink(buildVerificationLink(token))
+            .build());
+  }
+
+  /**
+   * Validate and consume a verification token (always succeeds in no-op mode).
+   *
+   * @param token The verification token
+   * @return Mono containing validation result
+   */
+  public Mono<RedisVerificationService.VerificationResult> validateAndConsumeToken(String token) {
+    if (token == null || token.trim().isEmpty()) {
+      return Mono.just(RedisVerificationService.VerificationResult.invalid("Token is required"));
+    }
+
+    log.info("🎯 NO-OP VERIFICATION: Accepting token as valid: {}", token);
+
+    // In no-op mode, we'll accept any non-empty token as valid
+    // This is useful for development/testing when Redis is not available
+    return Mono.just(
+        RedisVerificationService.VerificationResult.success(
+            999L, // Dummy user ID
+            "noop@example.com", // Dummy email
+            "STUDENT" // Dummy user type
+            ));
+  }
+
+  /** Get verification token information (not available in no-op mode). */
+  public Mono<RedisVerificationService.VerificationTokenData> getTokenInfo(String token) {
+    log.debug("🚫 NO-OP VERIFICATION: Token info not available in no-op mode");
+    return Mono.empty();
+  }
+
+  /** Invalidate a verification token (no-op). */
+  public Mono<Void> invalidateToken(String token) {
+    log.debug("🗑️ NO-OP VERIFICATION: Token invalidation simulated for: {}", token);
+    return Mono.empty();
+  }
+
+  /** Get verification service statistics (returns empty stats). */
+  public Mono<RedisVerificationService.VerificationStats> getStats() {
+    return Mono.just(
+        RedisVerificationService.VerificationStats.builder()
+            .tokensGenerated(0L)
+            .tokensVerified(0L)
+            .tokensExpired(0L)
+            .tokensAlreadyUsed(0L)
+            .tokensInvalidated(0L)
+            .rateLimitedAttempts(0L)
+            .validationErrors(0L)
+            .build());
+  }
+
+  /** Clear all verification data (no-op). */
+  public Mono<Long> clearAll() {
+    log.info("🧹 NO-OP VERIFICATION: Clear all operation simulated");
+    return Mono.just(0L);
+  }
+
+  /** Build verification link using configurable base URL. */
+  private String buildVerificationLink(String token) {
+    return String.format(
+        "%s/api/v1/auth/verify-email?token=%s", baseUrl.replaceAll("/$", ""), token);
+  }
+}

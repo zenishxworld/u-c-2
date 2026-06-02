@@ -1,0 +1,580 @@
+package com.uniflow.auth.controller;
+
+import com.uniflow.auth.dto.ForgotPasswordRequestDTO;
+import com.uniflow.auth.dto.LoginRequestDTO;
+import com.uniflow.auth.dto.LoginResponseDTO;
+import com.uniflow.auth.dto.PasswordResetResponseDTO;
+import com.uniflow.auth.dto.RefreshTokenRequestDTO;
+import com.uniflow.auth.dto.ResetPasswordRequestDTO;
+import com.uniflow.auth.service.AuthService;
+import com.uniflow.auth.service.RedisVerificationService;
+import com.uniflow.auth.service.VerificationServiceInterface;
+import com.uniflow.common.dto.ApiResponse;
+import com.uniflow.common.dto.ErrorResponse;
+import com.uniflow.common.dto.SuccessResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
+
+/**
+ * AuthController provides REST API endpoints for authentication operations
+ *
+ * <p>This controller handles user authentication, JWT token management, and session management
+ * operations. It follows the API contract defined in the implementation requirements.
+ *
+ * <p>Key Features: - User login with username/email and password - JWT access token and refresh
+ * token management - Token refresh for session extension - Secure logout with token blacklisting -
+ * Comprehensive error handling and security logging
+ */
+@RestController
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+@Slf4j
+@Tag(name = "Authentication", description = "APIs for user authentication and token management")
+public class AuthController {
+
+  private final AuthService authService;
+  private final VerificationServiceInterface verificationService;
+
+  /** User login endpoint POST /api/v1/auth/login */
+  @PostMapping("/login")
+  @Operation(
+      summary = "User Login",
+      description =
+          "Authenticate user with username/email and password. Returns JWT access token and refresh token for session management.")
+  public Mono<ResponseEntity<ApiResponse<LoginResponseDTO>>> login(
+      @Valid @RequestBody LoginRequestDTO request,
+      @Parameter(hidden = true) @RequestHeader(value = "User-Agent", required = false)
+          String userAgent,
+      @Parameter(hidden = true) @RequestHeader(value = "X-Forwarded-For", required = false)
+          String xForwardedFor,
+      @Parameter(hidden = true) @RequestHeader(value = "X-Real-IP", required = false)
+          String xRealIp) {
+    log.info("Login attempt for user: {}", request.getUsernameOrEmail());
+
+    // Extract IP address from headers
+    String clientIp = extractClientIp(xForwardedFor, xRealIp);
+    request.setIpAddress(clientIp);
+    request.setUserAgent(userAgent);
+
+    return authService
+        .login(request)
+        .map(
+            response -> {
+              if (response.isSuccess()) {
+                log.info("Successful login for user: {}", request.getUsernameOrEmail());
+                return ResponseEntity.ok(response);
+              } else {
+                log.warn(
+                    "Failed login for user: {} - {}",
+                    request.getUsernameOrEmail(),
+                    response.getMessage());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+              }
+            })
+        .onErrorResume(
+            error -> {
+              log.error("Login error for user: {}", request.getUsernameOrEmail(), error);
+              ApiResponse<LoginResponseDTO> errorResponse =
+                  ApiResponse.error("Authentication failed: " + error.getMessage());
+              return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse));
+            });
+  }
+
+  /** Token refresh endpoint POST /api/v1/auth/refresh */
+  @PostMapping("/refresh")
+  @Operation(
+      summary = "Refresh JWT Token",
+      description =
+          "Refresh expired access token using valid refresh token. Returns new access token and refresh token pair.")
+  public Mono<ResponseEntity<ApiResponse<LoginResponseDTO>>> refreshToken(
+      @Valid @RequestBody RefreshTokenRequestDTO request,
+      @Parameter(hidden = true) @RequestHeader(value = "User-Agent", required = false)
+          String userAgent,
+      @Parameter(hidden = true) @RequestHeader(value = "X-Forwarded-For", required = false)
+          String xForwardedFor,
+      @Parameter(hidden = true) @RequestHeader(value = "X-Real-IP", required = false)
+          String xRealIp) {
+    log.info("Token refresh attempt");
+
+    // Extract IP address from headers
+    String clientIp = extractClientIp(xForwardedFor, xRealIp);
+    request.setIpAddress(clientIp);
+    request.setUserAgent(userAgent);
+
+    return authService
+        .refreshToken(request)
+        .map(
+            response -> {
+              if (response.isSuccess()) {
+                log.info("Successful token refresh");
+                return ResponseEntity.ok(response);
+              } else {
+                log.warn("Failed token refresh - {}", response.getMessage());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+              }
+            })
+        .onErrorResume(
+            error -> {
+              log.error("Token refresh error", error);
+              ApiResponse<LoginResponseDTO> errorResponse =
+                  ApiResponse.error("Token refresh failed: " + error.getMessage());
+              return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse));
+            });
+  }
+
+  /** User logout endpoint POST /api/v1/auth/logout */
+  @PostMapping("/logout")
+  @Operation(
+      summary = "User Logout",
+      description =
+          "Logout user and invalidate JWT tokens. Blacklists both access token and refresh token to prevent further use.")
+  public Mono<ResponseEntity<ApiResponse<Void>>> logout(
+      @Parameter(description = "Bearer token in Authorization header", required = true)
+          @RequestHeader(HttpHeaders.AUTHORIZATION)
+          String authorizationHeader,
+      @Parameter(description = "Refresh token for complete logout")
+          @RequestHeader(value = "X-Refresh-Token", required = false)
+          String refreshToken) {
+    log.info("Logout attempt");
+
+    // Extract access token from Authorization header
+    String accessToken = extractTokenFromHeader(authorizationHeader);
+    if (accessToken == null) {
+      log.warn("Invalid authorization header format for logout");
+      ApiResponse<Void> errorResponse = ApiResponse.error("Invalid authorization header");
+      return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse));
+    }
+
+    return authService
+        .logout(accessToken, refreshToken)
+        .map(
+            response -> {
+              if (response.isSuccess()) {
+                log.info("Successful logout");
+                return ResponseEntity.ok(response);
+              } else {
+                log.warn("Failed logout - {}", response.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+              }
+            })
+        .onErrorResume(
+            error -> {
+              log.error("Logout error", error);
+              ApiResponse<Void> errorResponse =
+                  ApiResponse.error("Logout failed: " + error.getMessage());
+              return Mono.just(
+                  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse));
+            });
+  }
+
+  /** Token validation endpoint (for other microservices) GET /api/v1/auth/validate */
+  @GetMapping("/validate")
+  @Operation(
+      summary = "Validate JWT Token",
+      description =
+          "Validate JWT token and return user information. Used internally by other microservices for authentication.")
+  public Mono<ResponseEntity<ApiResponse<LoginResponseDTO>>> validateToken(
+      @Parameter(description = "Bearer token in Authorization header", required = true)
+          @RequestHeader(HttpHeaders.AUTHORIZATION)
+          String authorizationHeader) {
+    log.debug("Token validation request");
+
+    String accessToken = extractTokenFromHeader(authorizationHeader);
+    if (accessToken == null) {
+      log.warn("Invalid authorization header format for token validation");
+      ApiResponse<LoginResponseDTO> errorResponse =
+          ApiResponse.error("Invalid authorization header");
+      return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse));
+    }
+
+    // For now, return a simple validation response
+    // In a full implementation, this would validate the token and return user details
+    LoginResponseDTO validationResponse =
+        LoginResponseDTO.builder().username("validation-placeholder").tokenType("Bearer").build();
+
+    return Mono.just(
+        ResponseEntity.ok(
+            ApiResponse.success(
+                validationResponse, "Token validation endpoint - to be implemented")));
+  }
+
+  /** Health check endpoint GET /api/v1/auth/health */
+  @GetMapping("/health")
+  @Operation(
+      summary = "Auth Service Health Check",
+      description = "Check the health status of the authentication service")
+  public Mono<ResponseEntity<ApiResponse<String>>> healthCheck() {
+    return Mono.just(ResponseEntity.ok(ApiResponse.success("OK", "Auth service is healthy")));
+  }
+
+  /** Password reset request endpoint (placeholder) POST /api/v1/auth/forgot-password */
+  @PostMapping("/forgot-password")
+  @Operation(
+      summary = "Request Password Reset",
+      description = "Request password reset for user account. Sends reset link to user's email.")
+  public Mono<ResponseEntity<ApiResponse<PasswordResetResponseDTO>>> requestPasswordReset(
+      @Valid @RequestBody ForgotPasswordRequestDTO request, ServerHttpRequest serverRequest) {
+    String clientIp = extractClientIp(serverRequest);
+    log.info("Password reset request for email: {} from IP: {}", request.getEmail(), clientIp);
+
+    return authService
+        .forgotPassword(request, clientIp)
+        .map(response -> ResponseEntity.ok(response))
+        .onErrorResume(
+            error -> {
+              log.error("Password reset request failed", error);
+              return Mono.just(
+                  ResponseEntity.badRequest()
+                      .body(
+                          ApiResponse.error(
+                              "Password reset request failed: " + error.getMessage())));
+            });
+  }
+
+  /** Password reset link processing - validates token and sends temporary credentials */
+  @GetMapping("/reset-password")
+  @Operation(
+      summary = "Process Password Reset Link",
+      description =
+          "Process password reset link click, validates token and sends temporary credentials.")
+  public Mono<ResponseEntity<ApiResponse<PasswordResetResponseDTO>>> processPasswordResetLink(
+      @RequestParam("token") String token, ServerHttpRequest serverRequest) {
+    String clientIp = extractClientIp(serverRequest);
+    log.info("Password reset link clicked with token: {} from IP: {}", token, clientIp);
+
+    return authService
+        .processResetLink(token, clientIp)
+        .map(response -> ResponseEntity.ok(response))
+        .onErrorResume(
+            error -> {
+              log.error("Password reset link processing failed", error);
+              return Mono.just(
+                  ResponseEntity.badRequest()
+                      .body(
+                          ApiResponse.error(
+                              "Reset link processing failed: " + error.getMessage())));
+            });
+  }
+
+  /** Password reset confirmation endpoint POST /api/v1/auth/reset-password */
+  @PostMapping("/reset-password")
+  @Operation(
+      summary = "Confirm Password Reset",
+      description = "Confirm password reset using temporary credentials and set new password.")
+  public Mono<ResponseEntity<ApiResponse<PasswordResetResponseDTO>>> confirmPasswordReset(
+      @Valid @RequestBody ResetPasswordRequestDTO request, ServerHttpRequest serverRequest) {
+    String clientIp = extractClientIp(serverRequest);
+    log.info("Password reset confirmation with token from IP: {}", clientIp);
+
+    return authService
+        .resetPassword(request, clientIp)
+        .map(response -> ResponseEntity.ok(response))
+        .onErrorResume(
+            error -> {
+              log.error("Password reset confirmation failed", error);
+              return Mono.just(
+                  ResponseEntity.badRequest()
+                      .body(ApiResponse.error("Password reset failed: " + error.getMessage())));
+            });
+  }
+
+  /** Email verification endpoint GET /api/v1/auth/verify-email */
+  @GetMapping("/verify-email")
+  @Operation(
+      summary = "Verify Email Address",
+      description = "Verify user email address using verification token to activate account.")
+  public Mono<ResponseEntity<Object>> verifyEmail(
+      @Parameter(description = "Email verification token", required = true) @RequestParam("token")
+          String token) {
+    log.info("Email verification attempt with token");
+
+    return authService
+        .verifyEmail(token)
+        .map(
+            response -> {
+              if (response instanceof SuccessResponse) {
+                log.info("Email verification successful");
+                return ResponseEntity.ok((Object) response);
+              } else if (response instanceof ErrorResponse) {
+                log.warn("Email verification failed - {}", ((ErrorResponse) response).getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body((Object) response);
+              } else {
+                log.warn("Unknown response type");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body((Object) ErrorResponse.create("Unknown response type"));
+              }
+            })
+        .onErrorResume(
+            error -> {
+              log.error("Email verification error", error);
+              ErrorResponse errorResponse =
+                  ErrorResponse.create("Email verification failed: " + error.getMessage());
+              return Mono.just(
+                  ResponseEntity.status(HttpStatus.BAD_REQUEST).body((Object) errorResponse));
+            });
+  }
+
+  /** Get current user endpoint GET /api/v1/auth/me */
+  @GetMapping("/me")
+  @Operation(
+      summary = "Get Current User",
+      description = "Get current authenticated user information from JWT token.")
+  public Mono<ResponseEntity<ApiResponse<LoginResponseDTO>>> getCurrentUser(
+      @RequestHeader(HttpHeaders.AUTHORIZATION) String authorizationHeader) {
+    log.debug("Get current user request");
+
+    String accessToken = extractTokenFromHeader(authorizationHeader);
+    if (accessToken == null) {
+      log.warn("Invalid authorization header format for get current user");
+      ApiResponse<LoginResponseDTO> errorResponse =
+          ApiResponse.error("Invalid authorization header");
+      return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse));
+    }
+
+    // Placeholder implementation
+    LoginResponseDTO userResponse =
+        LoginResponseDTO.builder().username("current-user-placeholder").tokenType("Bearer").build();
+
+    return Mono.just(
+        ResponseEntity.ok(
+            ApiResponse.success(userResponse, "Get current user endpoint - to be implemented")));
+  }
+
+  /** Extract client IP address from various headers */
+  private String extractClientIp(String xForwardedFor, String xRealIp) {
+    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+      // X-Forwarded-For can contain multiple IPs, take the first one
+      return xForwardedFor.split(",")[0].trim();
+    } else if (xRealIp != null && !xRealIp.isEmpty()) {
+      return xRealIp.trim();
+    } else {
+      return "127.0.0.1"; // Default fallback
+    }
+  }
+
+  /** Extract client IP address from ServerHttpRequest */
+  private String extractClientIp(ServerHttpRequest request) {
+    String xForwardedFor = request.getHeaders().getFirst("X-Forwarded-For");
+    String xRealIp = request.getHeaders().getFirst("X-Real-IP");
+    return extractClientIp(xForwardedFor, xRealIp);
+  }
+
+  /** Extract JWT token from Authorization header */
+  private String extractTokenFromHeader(String authorizationHeader) {
+    if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+      return authorizationHeader.substring(7);
+    }
+    return null;
+  }
+
+  /** Global error handler for authentication controller */
+  @ExceptionHandler(Exception.class)
+  public Mono<ResponseEntity<ApiResponse<Object>>> handleException(Exception ex) {
+    log.error("Unhandled exception in AuthController", ex);
+    ApiResponse<Object> errorResponse = ApiResponse.error("Internal server error occurred");
+    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse));
+  }
+
+  /** Handle validation errors */
+  @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
+  public Mono<ResponseEntity<ApiResponse<Object>>> handleValidationException(
+      org.springframework.web.bind.MethodArgumentNotValidException ex) {
+    log.warn("Validation error in AuthController: {}", ex.getMessage());
+
+    StringBuilder errorMessage = new StringBuilder("Validation failed: ");
+    ex.getBindingResult()
+        .getFieldErrors()
+        .forEach(
+            error ->
+                errorMessage
+                    .append(error.getField())
+                    .append(" - ")
+                    .append(error.getDefaultMessage())
+                    .append("; "));
+
+    ApiResponse<Object> errorResponse = ApiResponse.error(errorMessage.toString());
+    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse));
+  }
+
+    /** Get verification service statistics GET /api/v1/auth/admin/verification-stats */
+    @GetMapping("/admin/verification-stats")
+    @Operation(
+        summary = "Get Verification Statistics",
+        description = "Get detailed statistics about email verification tokens and attempts (Admin only)"
+    )
+    public Mono<
+        ResponseEntity<ApiResponse<RedisVerificationService.VerificationStats>>
+    > getVerificationStats() {
+        log.info("Verification statistics request");
+
+    return verificationService
+        .getStats()
+        .map(
+            stats -> {
+              log.info(
+                  "Retrieved verification statistics: tokens generated={}, verified={}",
+                  stats.getTokensGenerated(),
+                  stats.getTokensVerified());
+              return ResponseEntity.ok(
+                  ApiResponse.success(stats, "Verification statistics retrieved successfully"));
+            })
+            .onErrorResume(error -> {
+                log.error("Error retrieving verification statistics", error);
+                ApiResponse<
+                    RedisVerificationService.VerificationStats
+                > errorResponse = ApiResponse.error(
+                    "Failed to retrieve verification statistics: " +
+                        error.getMessage()
+                );
+                return Mono.just(
+                    ResponseEntity.status(
+                        HttpStatus.INTERNAL_SERVER_ERROR
+                    ).body(errorResponse)
+                );
+            });
+  }
+
+    /** Get verification token information GET /api/v1/auth/admin/verification-token/{token} */
+    @GetMapping("/admin/verification-token/{token}")
+    @Operation(
+        summary = "Get Verification Token Info",
+        description = "Get detailed information about a specific verification token (Admin only)"
+    )
+    public Mono<
+        ResponseEntity<
+            ApiResponse<RedisVerificationService.VerificationTokenData>
+        >
+    > getVerificationTokenInfo(
+        @Parameter(
+            description = "Verification token",
+            required = true
+        ) @PathVariable("token") String token
+    ) {
+        log.info(
+            "Verification token info request for token: {}",
+            token.substring(0, Math.min(token.length(), 8)) + "..."
+        );
+
+    return verificationService
+        .getTokenInfo(token)
+        .map(
+            tokenData -> {
+              log.info("Retrieved token info for user ID: {}", tokenData.getUserId());
+              return ResponseEntity.ok(
+                  ApiResponse.success(tokenData, "Token information retrieved successfully"));
+            })
+            .switchIfEmpty(
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                        ApiResponse.error("Verification token not found")
+                    )
+                )
+            )
+            .onErrorResume(error -> {
+                log.error("Error retrieving token information", error);
+                ApiResponse<
+                    RedisVerificationService.VerificationTokenData
+                > errorResponse = ApiResponse.error(
+                    "Failed to retrieve token information: " +
+                        error.getMessage()
+                );
+                return Mono.just(
+                    ResponseEntity.status(
+                        HttpStatus.INTERNAL_SERVER_ERROR
+                    ).body(errorResponse)
+                );
+            });
+  }
+
+  /** Invalidate verification token DELETE /api/v1/auth/admin/verification-token/{token} */
+  @DeleteMapping("/admin/verification-token/{token}")
+  @Operation(
+      summary = "Invalidate Verification Token",
+      description = "Manually invalidate a verification token (Admin only)")
+  public Mono<ResponseEntity<ApiResponse<Void>>> invalidateVerificationToken(
+      @Parameter(description = "Verification token to invalidate", required = true)
+          @PathVariable("token")
+          String token) {
+    log.info(
+        "Verification token invalidation request for token: {}",
+        token.substring(0, Math.min(token.length(), 8)) + "...");
+
+    return verificationService
+        .invalidateToken(token)
+        .then(
+            Mono.just(
+                ResponseEntity.ok(
+                    ApiResponse.<Void>success(
+                        null, "Verification token invalidated successfully"))))
+        .onErrorResume(
+            error -> {
+              log.error("Error invalidating verification token", error);
+              ApiResponse<Void> errorResponse =
+                  ApiResponse.error(
+                      "Failed to invalidate verification token: " + error.getMessage());
+              return Mono.just(
+                  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse));
+            });
+  }
+
+  /** Clear all verification data DELETE /api/v1/auth/admin/verification-clear-all */
+  @DeleteMapping("/admin/verification-clear-all")
+  @Operation(
+      summary = "Clear All Verification Data",
+      description = "Clear all verification tokens and statistics (Admin only - USE WITH CAUTION)")
+  public Mono<ResponseEntity<ApiResponse<String>>> clearAllVerificationData() {
+    log.warn("Clear all verification data request - ADMINISTRATIVE ACTION");
+
+    return verificationService
+        .clearAll()
+        .map(
+            clearedCount -> {
+              String message = String.format("Cleared %d verification entries", clearedCount);
+              log.warn("ADMIN ACTION: {}", message);
+              return ResponseEntity.ok(
+                  ApiResponse.success(message, "All verification data cleared successfully"));
+            })
+        .onErrorResume(
+            error -> {
+              log.error("Error clearing verification data", error);
+              ApiResponse<String> errorResponse =
+                  ApiResponse.error("Failed to clear verification data: " + error.getMessage());
+              return Mono.just(
+                  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse));
+            });
+  }
+
+  /** Resend verification email POST /api/v1/auth/resend-verification */
+  @PostMapping("/resend-verification")
+  @Operation(
+      summary = "Resend Verification Email",
+      description = "Resend verification email for a user account")
+  public Mono<ResponseEntity<ApiResponse<String>>> resendVerificationEmail(
+      @Parameter(description = "User email address", required = true) @RequestParam("email")
+          String email) {
+    log.info("Resend verification email request for: {}", email);
+
+    // TODO: Implement resend verification logic
+    // This would involve:
+    // 1. Find user by email
+    // 2. Check if user needs verification
+    // 3. Generate new verification token
+    // 4. Send notification
+
+    return Mono.just(
+        ResponseEntity.ok(
+            ApiResponse.success(
+                "Verification email resend functionality will be implemented",
+                "Resend verification email - to be implemented")));
+  }
+}

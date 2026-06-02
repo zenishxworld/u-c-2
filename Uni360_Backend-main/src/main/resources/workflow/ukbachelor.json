@@ -1,0 +1,376 @@
+{
+    "success": true,
+    "message": "Workflow definition retrieved successfully",
+    "data": {
+        "id": 15,
+        "definitionKey": "UNI360_UK_BACHELOR_WORKFLOW",
+        "definitionName": "UNI360 UK BACHELOR Workflow",
+        "definitionDescription": "Workflow for uni360 client, UK country, BACHELOR degree applications",
+        "clientId": "uni360",
+        "countryCode": "UK",
+        "degreeLevel": "BACHELOR",
+        "version": 3,
+        "isActive": true,
+        "deploymentId": "uni360-af4cd335-1776405966086",
+        "workflowConfig": {
+            "name": "UK Bachelors Application Workflow",
+            "stages": [
+                {
+                    "name": "APPLICATION_REVIEW",
+                    "order": 1,
+                    "tasks": [
+                        {
+                            "type": "APPLICATION_CLAIM",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "GENERAL_ADMIN"
+                            ],
+                            "description": "Initial claim of application for processing",
+                            "displayName": "Claim Application",
+                            "requiredFlags": [
+                                "profile_completed",
+                                "documents_uploaded"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "APPLICATION_REVIEW"
+                            ],
+                            "estimatedDurationHours": 1
+                        }
+                    ],
+                    "description": "Initial review and validation of application documents",
+                    "displayName": "Application Review"
+                },
+                {
+                    "name": "ACADEMIC_EVALUATION",
+                    "order": 2,
+                    "tasks": [
+                        {
+                            "type": "DOCUMENT_VERIFICATION",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN"
+                            ],
+                            "description": "Verify all required documents are uploaded and valid",
+                            "displayName": "Document Verification",
+                            "requiredFlags": [
+                                "documents_uploaded",
+                                "transcript_verified",
+                                "diploma_verified"
+                            ],
+                            "validationRule": "DOCUMENT_UPLOADED",
+                            "requiredDocuments": [
+                                "TRANSCRIPT",
+                                "DIPLOMA",
+                                "PASSPORT"
+                            ],
+                            "estimatedDurationHours": 2
+                        },
+                        {
+                            "type": "ACADEMIC_VERIFICATION",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "ACADEMIC_SPECIALIST"
+                            ],
+                            "description": "Verify academic credentials meet UK university standards",
+                            "displayName": "Academic Credential Verification",
+                            "requiredFlags": [
+                                "academic_documents_uploaded",
+                                "gpa_calculated",
+                                "degree_verified"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "ACADEMIC_EVALUATION"
+                            ],
+                            "estimatedDurationHours": 3
+                        },
+                        {
+                            "type": "LANGUAGE_VERIFICATION",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "LANGUAGE_SPECIALIST",
+                                "COUNTRY_ADMIN"
+                            ],
+                            "description": "Verify language requirements for UK universities",
+                            "displayName": "Language Proficiency Verification",
+                            "requiredFlags": [
+                                "language_test_uploaded",
+                                "language_score_verified"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "estimatedDurationHours": 1
+                        }
+                    ],
+                    "description": "Evaluation of academic credentials and requirements",
+                    "displayName": "Academic Evaluation"
+                },
+                {
+                    "name": "CONDITIONAL_OFFER",
+                    "order": 3,
+                    "tasks": [
+                        {
+                            "type": "CONDITIONAL_OFFER_VERIFICATION",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "UNIVERSITY_LIAISON"
+                            ],
+                            "description": "Verify and process conditional offer letter received from university",
+                            "displayName": "Conditional Offer Verification",
+                            "requiredFlags": [
+                                "conditional_offer_received",
+                                "offer_conditions_reviewed"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredDocuments": [
+                                "CONDITIONAL_OFFER_LETTER"
+                            ],
+                            "requiredPermissions": [
+                                "OFFER_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 2
+                        }
+                    ],
+                    "description": "Receival of conditional offer letter from university",
+                    "displayName": "Conditional Offer"
+                },
+                {
+                    "name": "CAS_INTERVIEW",
+                    "order": 4,
+                    "tasks": [
+                        {
+                            "type": "CAS_INTERVIEW_SCHEDULED",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "INTERVIEW_COORDINATOR"
+                            ],
+                            "description": "Schedule CAS interview for the student",
+                            "displayName": "CAS Interview Scheduled",
+                            "requiredFlags": [
+                                "cas_interview_scheduled"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "CAS_INTERVIEW_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 1
+                        },
+                        {
+                            "type": "CAS_INTERVIEW_COMPLETED",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "INTERVIEW_COORDINATOR"
+                            ],
+                            "description": "Verify student has completed CAS interview",
+                            "displayName": "CAS Interview Completed",
+                            "requiredFlags": [
+                                "cas_interview_completed"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "CAS_INTERVIEW_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 1
+                        },
+                        {
+                            "type": "CAS_INTERVIEW_PASSED",
+                            "priority": 3,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "INTERVIEW_COORDINATOR"
+                            ],
+                            "description": "Verify student has passed CAS interview successfully",
+                            "displayName": "CAS Interview Passed",
+                            "requiredFlags": [
+                                "cas_interview_passed"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "CAS_INTERVIEW_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 1
+                        }
+                    ],
+                    "description": "CAS interview process and verification",
+                    "displayName": "CAS Interview"
+                },
+                {
+                    "name": "FEES_PAYMENT",
+                    "order": 5,
+                    "tasks": [
+                        {
+                            "type": "TUITION_FEES_PAYMENT",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "FINANCE_ADMIN",
+                                "COUNTRY_ADMIN"
+                            ],
+                            "description": "Verify student has paid tuition fees to the university",
+                            "displayName": "Tuition Fees Payment Verification",
+                            "requiredFlags": [
+                                "fees_payment_initiated",
+                                "fees_payment_completed",
+                                "payment_receipt_uploaded"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredDocuments": [
+                                "PAYMENT_RECEIPT",
+                                "PAYMENT_CONFIRMATION"
+                            ],
+                            "requiredPermissions": [
+                                "PAYMENT_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 2
+                        }
+                    ],
+                    "description": "Initiate and complete tuition fees payment",
+                    "displayName": "Fees Payment"
+                },
+                {
+                    "name": "UNCONDITIONAL_OFFER",
+                    "order": 6,
+                    "tasks": [
+                        {
+                            "type": "UNCONDITIONAL_OFFER_VERIFICATION",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "UNIVERSITY_LIAISON"
+                            ],
+                            "description": "Verify and process unconditional offer letter received from university",
+                            "displayName": "Unconditional Offer Verification",
+                            "requiredFlags": [
+                                "unconditional_offer_received",
+                                "unconditional_offer_verified"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredDocuments": [
+                                "UNCONDITIONAL_OFFER_LETTER"
+                            ],
+                            "requiredPermissions": [
+                                "OFFER_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 2
+                        }
+                    ],
+                    "description": "Receival of unconditional offer letter from university",
+                    "displayName": "Unconditional Offer"
+                },
+                {
+                    "name": "UNIVERSITY_SUBMISSION",
+                    "order": 7,
+                    "tasks": [
+                        {
+                            "type": "UNIVERSITY_SUBMISSION",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "UNIVERSITY_LIAISON"
+                            ],
+                            "description": "Submit complete application to selected UK universities",
+                            "displayName": "Submit to Universities",
+                            "requiredFlags": [
+                                "all_documents_verified",
+                                "fees_payment_completed",
+                                "universities_selected"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "UNIVERSITY_SUBMISSION"
+                            ],
+                            "estimatedDurationHours": 2
+                        }
+                    ],
+                    "description": "Submit complete application package to the UK university",
+                    "displayName": "University Submission"
+                },
+                {
+                    "name": "VISA_APPLICATION",
+                    "order": 8,
+                    "tasks": [
+                        {
+                            "type": "VISA_APPLICATION_SCHEDULED",
+                            "priority": 1,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "VISA_SPECIALIST"
+                            ],
+                            "description": "Schedule visa appointment for the student",
+                            "displayName": "Visa Appointment Scheduled",
+                            "requiredFlags": [
+                                "visa_appointment_scheduled"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredPermissions": [
+                                "VISA_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 1
+                        },
+                        {
+                            "type": "VISA_APPLICATION_COMPLETED",
+                            "priority": 2,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "VISA_SPECIALIST"
+                            ],
+                            "description": "Verify student has completed and submitted visa application",
+                            "displayName": "Visa Application Completed",
+                            "requiredFlags": [
+                                "visa_documents_prepared",
+                                "visa_application_submitted",
+                                "visa_fees_paid"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredDocuments": [
+                                "VISA_APPLICATION_FORM",
+                                "CAS_LETTER"
+                            ],
+                            "requiredPermissions": [
+                                "VISA_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 3
+                        },
+                        {
+                            "type": "VISA_APPLICATION_RESULT",
+                            "priority": 3,
+                            "ownerTypes": [
+                                "COUNTRY_ADMIN",
+                                "VISA_SPECIALIST"
+                            ],
+                            "description": "Record and verify the outcome of the student's visa application",
+                            "displayName": "Visa Application Result",
+                            "requiredFlags": [
+                                "visa_result_received",
+                                "visa_result_verified"
+                            ],
+                            "validationRule": "ADMIN_CONFIRMATION",
+                            "requiredDocuments": [
+                                "VISA_DECISION_LETTER"
+                            ],
+                            "requiredPermissions": [
+                                "VISA_VERIFICATION"
+                            ],
+                            "estimatedDurationHours": 1
+                        }
+                    ],
+                    "description": "Student visa application process",
+                    "displayName": "Visa Application"
+                }
+            ],
+            "countryCode": "UK",
+            "degreeLevel": "BACHELOR",
+            "description": "Complete workflow for Bachelor degree applications to UK universities",
+            "workflowDefinitionKey": "UK_BACHELORS_WORKFLOW"
+        },
+        "createdAt": "2026-04-17T06:06:06.201089",
+        "updatedAt": "2026-04-17T06:06:06.201089",
+        "createdBy": "admin@uni360.com",
+        "updatedBy": "admin@uni360.com"
+    },
+    "timestamp": "2026-05-22T10:20:20"
+}

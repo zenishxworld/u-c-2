@@ -1,0 +1,2 @@
+user default on fcEHv8cQpY sanitize-payload ~* &* +@all
+user uniflow on >uniflow +get +set +ping +auth ~uniflow:*

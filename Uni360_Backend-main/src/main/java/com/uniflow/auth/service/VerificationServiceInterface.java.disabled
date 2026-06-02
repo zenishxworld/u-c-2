@@ -1,0 +1,62 @@
+package com.uniflow.auth.service;
+
+import reactor.core.publisher.Mono;
+
+/**
+ * Interface for verification services that handle email verification tokens.
+ *
+ * <p>This interface allows for different implementations: - RedisVerificationService: Full
+ * Redis-backed implementation with persistence and rate limiting - NoOpVerificationService: Simple
+ * fallback implementation for development/testing
+ */
+public interface VerificationServiceInterface {
+
+  /**
+   * Generate and store a verification token for a user.
+   *
+   * @param userId The user ID
+   * @param email The user's email address
+   * @param userType The type of user (STUDENT, ADMIN)
+   * @return Mono containing the verification token and expiry information
+   */
+  Mono<RedisVerificationService.VerificationTokenInfo> generateVerificationToken(
+      Long userId, String email, String userType);
+
+  /**
+   * Validate and consume a verification token.
+   *
+   * @param token The verification token
+   * @return Mono containing validation result
+   */
+  Mono<RedisVerificationService.VerificationResult> validateAndConsumeToken(String token);
+
+  /**
+   * Get verification token information without consuming it.
+   *
+   * @param token The verification token
+   * @return Mono containing token data or empty if not found
+   */
+  Mono<RedisVerificationService.VerificationTokenData> getTokenInfo(String token);
+
+  /**
+   * Invalidate a verification token.
+   *
+   * @param token The verification token to invalidate
+   * @return Mono that completes when token is invalidated
+   */
+  Mono<Void> invalidateToken(String token);
+
+  /**
+   * Get verification service statistics.
+   *
+   * @return Mono containing service statistics
+   */
+  Mono<RedisVerificationService.VerificationStats> getStats();
+
+  /**
+   * Clear all verification data (for testing/admin purposes).
+   *
+   * @return Mono containing count of cleared entries
+   */
+  Mono<Long> clearAll();
+}

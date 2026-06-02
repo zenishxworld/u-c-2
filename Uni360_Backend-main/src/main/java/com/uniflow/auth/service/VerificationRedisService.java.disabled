@@ -1,0 +1,207 @@
+package com.uniflow.auth.service;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RedissonReactiveClient;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+/** Redis service for managing email verification links and tracking verification attempts */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class VerificationRedisService {
+
+  private final RedissonReactiveClient redissonReactiveClient;
+
+  @Value("${uniflow.verification.redis-prefix:verify}")
+  private String redisPrefix;
+
+  @Value("${uniflow.verification.link-ttl:86400}")
+  private Long linkTtlSeconds;
+
+  /** Store verification link in Redis with expiration Key format: verify:<email>:link */
+  public Mono<Void> storeVerificationLink(
+      String email, String verificationToken, String verificationLink) {
+    String key = buildLinkKey(email);
+
+    // Create verification data as JSON-like string
+    String verificationData =
+        String.format(
+            "{\"token\":\"%s\",\"link\":\"%s\",\"created\":\"%s\",\"email\":\"%s\"}",
+            verificationToken,
+            verificationLink,
+            LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            email);
+
+    return redissonReactiveClient
+        .getBucket(key)
+        .set(verificationData, Duration.ofSeconds(linkTtlSeconds))
+        .doOnSuccess(
+            result ->
+                log.debug(
+                    "Stored verification link in Redis for email: {} with TTL: {}s",
+                    email,
+                    linkTtlSeconds))
+        .doOnError(
+            error ->
+                log.error("Failed to store verification link in Redis for email: {}", email, error))
+        .then();
+  }
+
+  /** Get verification link from Redis */
+  public Mono<String> getVerificationLink(String email) {
+    String key = buildLinkKey(email);
+
+    return redissonReactiveClient
+        .getBucket(key)
+        .get()
+        .cast(String.class)
+        .doOnNext(data -> log.debug("Retrieved verification link from Redis for email: {}", email))
+        .doOnError(
+            error ->
+                log.error(
+                    "Failed to retrieve verification link from Redis for email: {}", email, error));
+  }
+
+  /** Check if verification link exists and is valid */
+  public Mono<Boolean> hasValidVerificationLink(String email) {
+    String key = buildLinkKey(email);
+
+    return redissonReactiveClient
+        .getBucket(key)
+        .isExists()
+        .doOnNext(exists -> log.debug("Verification link exists for email {}: {}", email, exists));
+  }
+
+  /** Remove verification link from Redis (after successful verification) */
+  public Mono<Void> removeVerificationLink(String email) {
+    String key = buildLinkKey(email);
+
+    return redissonReactiveClient
+        .getBucket(key)
+        .delete()
+        .doOnNext(
+            deleted ->
+                log.debug(
+                    "Removed verification link from Redis for email: {} (deleted: {})",
+                    email,
+                    deleted))
+        .then();
+  }
+
+  /** Track verification attempt Key format: verify:<email>:attempts */
+  public Mono<Long> incrementVerificationAttempts(String email) {
+    String key = buildAttemptsKey(email);
+
+    return redissonReactiveClient
+        .getAtomicLong(key)
+        .incrementAndGet()
+        .flatMap(
+            count -> {
+              // Set expiration on first attempt
+              if (count == 1) {
+                return redissonReactiveClient
+                    .getAtomicLong(key)
+                    .expire(Duration.ofSeconds(linkTtlSeconds))
+                    .thenReturn(count);
+              }
+              return Mono.just(count);
+            })
+        .doOnNext(attempts -> log.debug("Verification attempts for email {}: {}", email, attempts))
+        .doOnError(
+            error ->
+                log.error("Failed to increment verification attempts for email: {}", email, error));
+  }
+
+  /** Get verification attempt count */
+  public Mono<Long> getVerificationAttempts(String email) {
+    String key = buildAttemptsKey(email);
+
+    return redissonReactiveClient
+        .getAtomicLong(key)
+        .get()
+        .onErrorReturn(0L)
+        .doOnNext(
+            attempts ->
+                log.debug("Current verification attempts for email {}: {}", email, attempts));
+  }
+
+  /** Store verification success timestamp Key format: verify:<email>:success */
+  public Mono<Void> markVerificationSuccess(String email) {
+    String key = buildSuccessKey(email);
+    String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+
+    return redissonReactiveClient
+        .getBucket(key)
+        .set(timestamp, Duration.ofDays(30)) // Keep success record for 30 days
+        .doOnSuccess(
+            result -> log.info("Marked verification success in Redis for email: {}", email))
+        .then();
+  }
+
+  /** Check if email was successfully verified (from Redis record) */
+  public Mono<Boolean> wasEmailVerified(String email) {
+    String key = buildSuccessKey(email);
+
+    return redissonReactiveClient
+        .getBucket(key)
+        .isExists()
+        .doOnNext(
+            verified ->
+                log.debug("Email verification status from Redis for {}: {}", email, verified));
+  }
+
+  /** Get verification statistics for an email */
+  public Mono<VerificationStats> getVerificationStats(String email) {
+    return Mono.zip(
+            getVerificationAttempts(email),
+            hasValidVerificationLink(email),
+            wasEmailVerified(email))
+        .map(
+            tuple ->
+                VerificationStats.builder()
+                    .email(email)
+                    .attempts(tuple.getT1())
+                    .hasActiveLink(tuple.getT2())
+                    .isVerified(tuple.getT3())
+                    .build())
+        .doOnNext(stats -> log.debug("Verification stats for {}: {}", email, stats));
+  }
+
+  /** Clean up all verification data for an email (use after successful verification) */
+  public Mono<Void> cleanupVerificationData(String email) {
+    return Mono.when(
+            removeVerificationLink(email),
+            redissonReactiveClient.getAtomicLong(buildAttemptsKey(email)).delete().then())
+        .doOnSuccess(result -> log.debug("Cleaned up verification data for email: {}", email));
+  }
+
+  // Key builders
+  private String buildLinkKey(String email) {
+    return String.format("%s:%s:link", redisPrefix, email.toLowerCase());
+  }
+
+  private String buildAttemptsKey(String email) {
+    return String.format("%s:%s:attempts", redisPrefix, email.toLowerCase());
+  }
+
+  private String buildSuccessKey(String email) {
+    return String.format("%s:%s:success", redisPrefix, email.toLowerCase());
+  }
+
+  /** Verification statistics data class */
+  @lombok.Builder
+  @lombok.Data
+  public static class VerificationStats {
+
+    private String email;
+    private Long attempts;
+    private Boolean hasActiveLink;
+    private Boolean isVerified;
+  }
+}

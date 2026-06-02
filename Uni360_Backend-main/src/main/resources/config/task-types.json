@@ -1,0 +1,335 @@
+{
+  "taskTypes": [
+    {
+      "code": "APPLICATION_CLAIM",
+      "displayName": "Claim Application",
+      "description": "Claim and take ownership of a new application",
+      "owner": "ADMIN",
+      "category": "WORKFLOW",
+      "automationLevel": "MANUAL",
+      "estimatedDurationHours": 0.5,
+      "priority": 1,
+      "requiresSpecialist": false,
+      "countrySpecific": true,
+      "requiredPermissions": ["can_process_applications"],
+      "validationRules": {
+        "requiredFields": ["claimReason"],
+        "automationCapable": false
+      }
+    },
+    {
+      "code": "DOCUMENT_VERIFICATION",
+      "displayName": "Verify Documents",
+      "description": "Review and verify student uploaded documents",
+      "owner": "ADMIN",
+      "category": "VERIFICATION",
+      "automationLevel": "SEMI_AUTOMATED",
+      "estimatedDurationHours": 2,
+      "priority": 2,
+      "requiresSpecialist": true,
+      "countrySpecific": true,
+      "requiredPermissions": ["can_verify_documents"],
+      "validationRules": {
+        "requiredFields": ["verificationStatus", "verificationNotes"],
+        "documentTypes": ["ACADEMIC", "PERSONAL", "FINANCIAL"],
+        "automationCapable": true
+      }
+    },
+    {
+      "code": "PAYMENT_PROCESSING",
+      "displayName": "Process Payment",
+      "description": "Process and verify application payments",
+      "owner": "ADMIN",
+      "category": "FINANCIAL",
+      "automationLevel": "AUTOMATED",
+      "estimatedDurationDays": 1,
+      "priority": 1,
+      "requiresSpecialist": false,
+      "countrySpecific": false,
+      "studentInstructions": "Complete payment using the provided link",
+      "paymentDetails": {
+        "amount": "Variable",
+        "currency": "EUR/USD",
+        "paymentMethods": ["CARD", "BANK_TRANSFER", "PAYPAL"],
+        "processingTime": "1-2 business days"
+      }
+    },
+    {
+      "code": "APS_CERTIFICATE_VERIFICATION",
+      "displayName": "Verify APS Certificate",
+      "description": "Verify APS certificate validity and authenticity for German applications",
+      "owner": "ADMIN",
+      "category": "VERIFICATION",
+      "automationLevel": "MANUAL",
+      "estimatedDurationHours": 3,
+      "priority": 2,
+      "requiresSpecialist": true,
+      "countrySpecific": true,
+      "countryCode": "DE",
+      "requiredPermissions": [
+        "can_verify_documents",
+        "can_verify_certificates"
+      ],
+      "validationRules": {
+        "requiredFields": [
+          "certificateNumber",
+          "issueDate",
+          "verificationStatus"
+        ],
+        "documentTypes": ["APS_CERTIFICATE"],
+        "automationCapable": false
+      }
+    },
+    {
+      "code": "UNIVERSITY_SUBMISSION",
+      "displayName": "Submit to University",
+      "description": "Submit completed application to target university",
+      "owner": "ADMIN",
+      "category": "SUBMISSION",
+      "automationLevel": "SEMI_AUTOMATED",
+      "estimatedDurationHours": 1,
+      "priority": 1,
+      "requiresSpecialist": false,
+      "countrySpecific": true,
+      "requiredPermissions": ["can_submit_applications"],
+      "validationRules": {
+        "automationCapable": true
+      }
+    },
+    {
+      "code": "INTERVIEW_SCHEDULING",
+      "displayName": "Schedule Interview",
+      "description": "Schedule and coordinate student interviews",
+      "owner": "ADMIN",
+      "category": "COMMUNICATION",
+      "automationLevel": "MANUAL",
+      "estimatedDurationHours": 0.5,
+      "priority": 3,
+      "requiresSpecialist": false,
+      "countrySpecific": false,
+      "requiredPermissions": ["can_schedule_interviews"],
+      "validationRules": {
+        "requiredFields": ["interviewDate", "interviewType", "interviewerName"],
+        "automationCapable": false
+      }
+    },
+    {
+      "code": "VISA_DOCUMENTATION",
+      "displayName": "Prepare Visa Documents",
+      "description": "Prepare and verify visa application documents",
+      "owner": "ADMIN",
+      "category": "VERIFICATION",
+      "automationLevel": "MANUAL",
+      "estimatedDurationHours": 4,
+      "priority": 2,
+      "requiresSpecialist": true,
+      "countrySpecific": true,
+      "requiredPermissions": ["can_process_visas"],
+      "validationRules": {
+        "requiredFields": ["visaType", "documentsList", "verificationStatus"],
+        "documentTypes": ["PASSPORT", "FINANCIAL", "INVITATION"],
+        "automationCapable": false
+      }
+    },
+    {
+      "code": "TRANSCRIPT_EVALUATION",
+      "displayName": "Evaluate Transcripts",
+      "description": "Evaluate and verify academic transcripts",
+      "owner": "ADMIN",
+      "category": "VERIFICATION",
+      "automationLevel": "SEMI_AUTOMATED",
+      "estimatedDurationHours": 2.5,
+      "priority": 2,
+      "requiresSpecialist": true,
+      "countrySpecific": true,
+      "countryCode": "US",
+      "requiredPermissions": [
+        "can_verify_documents",
+        "can_evaluate_transcripts"
+      ],
+      "validationRules": {
+        "requiredFields": [
+          "gpaCalculation",
+          "creditsTransfer",
+          "evaluationNotes"
+        ],
+        "documentTypes": ["ACADEMIC"],
+        "automationCapable": true
+      }
+    },
+    {
+      "code": "IELTS_VERIFICATION",
+      "displayName": "Verify IELTS Score",
+      "description": "Verify IELTS test scores and validity",
+      "owner": "ADMIN",
+      "category": "VERIFICATION",
+      "automationLevel": "AUTOMATED",
+      "estimatedDurationHours": 0.25,
+      "priority": 3,
+      "requiresSpecialist": false,
+      "countrySpecific": false,
+      "requiredPermissions": ["can_verify_documents"],
+      "validationRules": {
+        "requiredFields": ["testDate", "overallScore", "verificationCode"],
+        "documentTypes": ["ENGLISH_PROFICIENCY"],
+        "automationCapable": true
+      }
+    },
+    {
+      "code": "SCHOLARSHIP_PROCESSING",
+      "displayName": "Process Scholarship",
+      "description": "Review and process scholarship applications",
+      "owner": "ADMIN",
+      "category": "FINANCIAL",
+      "automationLevel": "MANUAL",
+      "estimatedDurationHours": 3,
+      "priority": 2,
+      "requiresSpecialist": true,
+      "countrySpecific": false,
+      "requiredPermissions": ["can_process_scholarships"],
+      "validationRules": {
+        "requiredFields": [
+          "scholarshipType",
+          "eligibilityCriteria",
+          "awardAmount"
+        ],
+        "automationCapable": false
+      }
+    }
+  ],
+  "categories": [
+    {
+      "code": "WORKFLOW",
+      "displayName": "Workflow Management",
+      "description": "Core workflow and process management tasks"
+    },
+    {
+      "code": "VERIFICATION",
+      "displayName": "Document Verification",
+      "description": "Document review and verification tasks"
+    },
+    {
+      "code": "FINANCIAL",
+      "displayName": "Financial Processing",
+      "description": "Payment and financial related tasks"
+    },
+    {
+      "code": "COMMUNICATION",
+      "displayName": "Communication",
+      "description": "Student and university communication tasks"
+    },
+    {
+      "code": "SUBMISSION",
+      "displayName": "University Submission",
+      "description": "Application submission to universities"
+    }
+  ],
+  "automationLevels": [
+    {
+      "code": "MANUAL",
+      "displayName": "Manual",
+      "description": "Requires full manual processing by admin"
+    },
+    {
+      "code": "SEMI_AUTOMATED",
+      "displayName": "Semi-Automated",
+      "description": "Partially automated with admin review required"
+    },
+    {
+      "code": "AUTOMATED",
+      "displayName": "Automated",
+      "description": "Fully automated processing"
+    }
+  ],
+  "countrySpecificTasks": {
+    "DE": {
+      "displayName": "Germany",
+      "tasks": [
+        "APS_CERTIFICATE_VERIFICATION",
+        "UNIVERSITY_SUBMISSION",
+        "VISA_DOCUMENTATION"
+      ],
+      "specialRequirements": [
+        "APS certificate is mandatory for most programs",
+        "Blocked account proof required for visa",
+        "German language proficiency may be required"
+      ]
+    },
+    "US": {
+      "displayName": "United States",
+      "tasks": [
+        "TRANSCRIPT_EVALUATION",
+        "VISA_DOCUMENTATION",
+        "INTERVIEW_SCHEDULING"
+      ],
+      "specialRequirements": [
+        "WES evaluation may be required",
+        "I-20 form processing for visa",
+        "SEVIS fee payment required"
+      ]
+    },
+    "CA": {
+      "displayName": "Canada",
+      "tasks": ["WES_EVALUATION", "IMMIGRATION_FORMS", "VISA_DOCUMENTATION"],
+      "specialRequirements": [
+        "WES evaluation required for most programs",
+        "Study permit application processing",
+        "Provincial nomination may be applicable"
+      ]
+    },
+    "UK": {
+      "displayName": "United Kingdom",
+      "tasks": ["ATAS_CLEARANCE", "CAS_GENERATION", "VISA_DOCUMENTATION"],
+      "specialRequirements": [
+        "ATAS clearance for certain subjects",
+        "CAS number required for visa application",
+        "Immigration Health Surcharge payment"
+      ]
+    },
+    "AU": {
+      "displayName": "Australia",
+      "tasks": [
+        "SKILLS_ASSESSMENT",
+        "VISA_DOCUMENTATION",
+        "HEALTH_EXAMINATION"
+      ],
+      "specialRequirements": [
+        "Skills assessment may be required",
+        "Overseas Student Health Cover (OSHC)",
+        "Health examinations for certain countries"
+      ]
+    }
+  },
+  "priorityLevels": [
+    {
+      "level": 1,
+      "displayName": "High Priority",
+      "description": "Urgent tasks requiring immediate attention",
+      "slaHours": 24
+    },
+    {
+      "level": 2,
+      "displayName": "Normal Priority",
+      "description": "Standard priority tasks",
+      "slaHours": 72
+    },
+    {
+      "level": 3,
+      "displayName": "Low Priority",
+      "description": "Low priority tasks that can be scheduled",
+      "slaHours": 168
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdated": "2024-10-01T00:00:00Z",
+    "configurationFormat": "1.0",
+    "supportedFeatures": [
+      "dynamic_task_types",
+      "country_specific_workflows",
+      "automation_levels",
+      "priority_management",
+      "validation_rules"
+    ]
+  }
+}
